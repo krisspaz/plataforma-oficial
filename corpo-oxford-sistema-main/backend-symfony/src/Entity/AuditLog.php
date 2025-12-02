@@ -2,19 +2,64 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use App\Repository\AuditLogRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: AuditLogRepository::class)]
 #[ORM\Table(name: 'audit_logs')]
+#[ORM\Index(columns: ['created_at'], name: 'idx_audit_created')]
+#[ORM\Index(columns: ['user_id'], name: 'idx_audit_user')]
+#[ApiResource(
+    normalizationContext: ['groups' => ['auditlog:read']],
+    denormalizationContext: ['groups' => ['auditlog:write']]
+)]
 class AuditLog
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['auditlog:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'auditLogs')]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
     private ?User $user = null;
+
+    #[ORM\Column(length: 100)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?string $action = null;
+
+    #[ORM\Column(length: 100)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?string $entity = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?int $entityId = null;
+
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?array $changes = null;
+
+    #[ORM\Column(length: 45, nullable: true)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?string $ip = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['auditlog:read', 'auditlog:write'])]
+    private ?string $userAgent = null;
+
+    #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['auditlog:read'])]
+    private ?\DateTimeInterface $createdAt = null;
+
+    public function __construct()
+    {
+        $this->createdAt = new \DateTime();
+    }
 
     public function getId(): ?int
     {
@@ -29,6 +74,83 @@ class AuditLog
     public function setUser(?User $user): static
     {
         $this->user = $user;
+        return $this;
+    }
+
+    public function getAction(): ?string
+    {
+        return $this->action;
+    }
+
+    public function setAction(string $action): static
+    {
+        $this->action = $action;
+        return $this;
+    }
+
+    public function getEntity(): ?string
+    {
+        return $this->entity;
+    }
+
+    public function setEntity(string $entity): static
+    {
+        $this->entity = $entity;
+        return $this;
+    }
+
+    public function getEntityId(): ?int
+    {
+        return $this->entityId;
+    }
+
+    public function setEntityId(?int $entityId): static
+    {
+        $this->entityId = $entityId;
+        return $this;
+    }
+
+    public function getChanges(): ?array
+    {
+        return $this->changes;
+    }
+
+    public function setChanges(?array $changes): static
+    {
+        $this->changes = $changes;
+        return $this;
+    }
+
+    public function getIp(): ?string
+    {
+        return $this->ip;
+    }
+
+    public function setIp(?string $ip): static
+    {
+        $this->ip = $ip;
+        return $this;
+    }
+
+    public function getUserAgent(): ?string
+    {
+        return $this->userAgent;
+    }
+
+    public function setUserAgent(?string $userAgent): static
+    {
+        $this->userAgent = $userAgent;
+        return $this;
+    }
+
+    public function getCreatedAt(): ?\DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeInterface $createdAt): static
+    {
+        $this->createdAt = $createdAt;
         return $this;
     }
 }
