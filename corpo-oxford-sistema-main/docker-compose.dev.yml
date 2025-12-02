@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: oxford_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: escuela_db
+      POSTGRES_USER: escuela_user
+      POSTGRES_PASSWORD: escuela_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - oxford_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: oxford_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - oxford_network
+
+  # Symfony Backend API
+  symfony_backend:
+    build:
+      context: ./backend-symfony
+      dockerfile: Dockerfile
+    container_name: oxford_symfony
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgresql://escuela_user:escuela_pass@postgres:5432/escuela_db?serverVersion=16&charset=utf8
+      REDIS_URL: redis://redis:6379
+      APP_ENV: dev
+    volumes:
+      - ./backend-symfony:/app
+      - symfony_var:/app/var
+    networks:
+      - oxford_network
+    command: symfony server:start --no-tls --port=8000
+
+  # Laravel Backend (Legacy - opcional)
+  laravel_backend:
+    build: .
+    container_name: oxford_laravel
+    restart: on-failure
+    env_file:
+      - .oxford.env
+    ports:
+      - "8200:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    networks:
+      - oxford_network
+    depends_on:
+      - postgres
+
+  # React Frontend
+  react_frontend:
+    build:
+      context: ../colegio-connect-main
+      dockerfile: Dockerfile
+    container_name: oxford_react
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../colegio-connect-main:/app
+      - /app/node_modules
+    networks:
+      - oxford_network
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    command: npm run dev -- --host
+
+  # Mercure Hub (Real-time chat)
+  mercure:
+    image: dunglas/mercure
+    container_name: oxford_mercure
+    restart: unless-stopped
+    environment:
+      SERVER_NAME: ':3000'
+      MERCURE_PUBLISHER_JWT_KEY: '!ChangeThisMercureHubJWTSecretKey!'
+      MERCURE_SUBSCRIBER_JWT_KEY: '!ChangeThisMercureHubJWTSecretKey!'
+    ports:
+      - "3000:3000"
+    networks:
+      - oxford_network
+
+  # pgAdmin (Database Management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: oxford_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@oxford.edu.gt
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - oxford_network
+
+volumes:
+  postgres_data:
+  app_storage:
+  symfony_var:
+
+networks:
+  oxford_network:
+    driver: bridge
