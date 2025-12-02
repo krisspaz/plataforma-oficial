@@ -48,25 +48,25 @@ services:
       - symfony_var:/app/var
     networks:
       - oxford_network
-    command: symfony server:start --no-tls --port=8000
 
   # Laravel Backend (Legacy - opcional)
-  laravel_backend:
-    build: .
-    container_name: oxford_laravel
-    restart: on-failure
-    env_file:
-      - .oxford.env
-    ports:
-      - "8200:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - app_storage:/var/www/html/storage/app
-    networks:
-      - oxford_network
-    depends_on:
-      - postgres
+  # Laravel Backend (Legacy - opcional)
+  # laravel_backend:
+  #   build: .
+  #   container_name: oxford_laravel
+  #   restart: on-failure
+  #   env_file:
+  #     - .oxford.env
+  #   ports:
+  #     - "8200:8000"
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   volumes:
+  #     - app_storage:/var/www/html/storage/app
+  #   networks:
+  #     - oxford_network
+  #   depends_on:
+  #     - postgres
 
   # React Frontend
   react_frontend:
@@ -76,7 +76,7 @@ services:
     container_name: oxford_react
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "5174:5173"
     volumes:
       - ../colegio-connect-main:/app
       - /app/node_modules
@@ -119,6 +119,7 @@ volumes:
   postgres_data:
   app_storage:
   symfony_var:
+
 
 networks:
   oxford_network:
