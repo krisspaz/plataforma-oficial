@@ -41,11 +41,11 @@ class TeacherRepository extends ServiceEntityRepository
         
         return $this->createQueryBuilder('t')
             ->innerJoin('t.user', 'u')
-            ->where('MONTH(t.birthDate) = :month')
+            ->where('EXTRACT(MONTH FROM t.birthDate) = :month')
             ->andWhere('u.isActive = :active')
             ->setParameter('month', $currentMonth)
             ->setParameter('active', true)
-            ->orderBy('DAY(t.birthDate)', 'ASC')
+            ->orderBy('EXTRACT(DAY FROM t.birthDate)', 'ASC')
             ->getQuery()
             ->getResult();
     }

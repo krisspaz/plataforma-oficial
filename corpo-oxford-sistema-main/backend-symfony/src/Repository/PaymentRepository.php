@@ -64,11 +64,15 @@ class PaymentRepository extends ServiceEntityRepository
      */
     public function getDailyTotal(\DateTime $date): float
     {
+        $startOfDay = (clone $date)->setTime(0, 0, 0);
+        $endOfDay = (clone $date)->setTime(23, 59, 59);
+        
         $result = $this->createQueryBuilder('p')
             ->select('SUM(p.amount) as total')
-            ->where('DATE(p.paidDate) = :date')
+            ->where('p.paidDate BETWEEN :start AND :end')
             ->andWhere('p.status = :status')
-            ->setParameter('date', $date->format('Y-m-d'))
+            ->setParameter('start', $startOfDay)
+            ->setParameter('end', $endOfDay)
             ->setParameter('status', 'paid')
             ->getQuery()
             ->getSingleScalarResult();
