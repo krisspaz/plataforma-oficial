@@ -1,0 +1,73 @@
+groups:
+  - name: school_platform_alerts
+    interval: 30s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{pod=~"school-platform.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "Pod {{ $labels.pod }} has CPU usage above 80% for 5 minutes"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{pod=~"school-platform.*"} / container_spec_memory_limit_bytes{pod=~"school-platform.*"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Pod {{ $labels.pod }} has memory usage above 90%"
+
+      # Pod Restart
+      - alert: PodRestarting
+        expr: rate(kube_pod_container_status_restarts_total{pod=~"school-platform.*"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod is restarting frequently"
+          description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"
+
+      # Database Connection Issues
+      - alert: DatabaseConnectionFailure
+        expr: up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database is unreachable"
+
+      # High API Error Rate
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is above 5% for 5 minutes"
+
+      # Slow API Response Time
+      - alert: SlowAPIResponse
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow API response time"
+          description: "95th percentile of API response time is above 1 second"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space is running low"
+          description: "Disk space on {{ $labels.instance }} is below 10%"

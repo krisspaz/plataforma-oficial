@@ -1,7 +1,42 @@
+# config/packages/api_platform.yaml
 api_platform:
-    title: Hello API Platform
-    version: 1.0.0
+    title: 'Plataforma Escolar API'
+    version: '2.0.0'
+    description: 'API REST y GraphQL para la Plataforma de Gestión Escolar'
+    
+    # Formats supported
+    formats:
+        jsonld:   ['application/ld+json']
+        json:     ['application/json']
+        html:     ['text/html']
+    
+    # Documentation
+    enable_swagger: true
+    enable_swagger_ui: true
+    enable_re_doc: true
+    enable_entrypoint: true
+    enable_docs: true
+    
+    # GraphQL configuration
+    graphql:
+        enabled: true
+        graphiql:
+            enabled: true
+        default_ide: 'graphiql'
+        
+    # Pagination
     defaults:
-        stateless: true
-        cache_headers:
-            vary: ['Content-Type', 'Authorization', 'Origin']
+        pagination_enabled: true
+        pagination_items_per_page: 30
+        pagination_maximum_items_per_page: 100
+        
+    # Error handling
+    exception_to_status:
+        # Default mapping
+        Symfony\Component\Serializer\Exception\ExceptionInterface: 400
+        ApiPlatform\Exception\InvalidArgumentException: 400
+        ApiPlatform\Exception\FilterValidationException: 400
+        Doctrine\ORM\OptimisticLockException: 409
+        
+    # Cache
+    # cache_metadata: true

@@ -1,0 +1,37 @@
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # https://symfony.com/doc/current/messenger.html#transport-configuration
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    use_notify: true
+                    check_delayed_interval: 60000
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 0
+
+            failed: 'doctrine://default?queue_name=failed'
+            
+            # Sync transport for development/testing or immediate execution
+            sync: 'sync://'
+
+        routing:
+            # Route your messages to the transports
+            # 'App\Message\YourMessage': async
+            'App\Domain\Student\Event\StudentCreatedEvent': async
+            'App\Message\SendEmailMessage': async
+            'App\Message\AuditLogMessage': async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                # replace with your transport name here (e.g., my_transport: 'in-memory://')
+                # For more info: https://symfony.com/doc/current/messenger.html#transport-configuration
+                async: 'in-memory://'

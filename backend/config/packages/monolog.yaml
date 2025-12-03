@@ -1,0 +1,88 @@
+# config/packages/monolog.yaml
+when@dev:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: "%kernel.logs_dir%/%kernel.environment%.log"
+                level: debug
+                channels: ["!event"]
+            console:
+                type: console
+                process_psr_3_messages: false
+                channels: ["!event", "!doctrine", "!console"]
+
+when@prod:
+    monolog:
+        handlers:
+            # Main application log
+            main:
+                type: fingers_crossed
+                action_level: error
+                handler: nested
+                excluded_http_codes: [404, 405]
+                buffer_size: 50
+            nested:
+                type: stream
+                path: php://stderr
+                level: debug
+                formatter: monolog.formatter.json
+            
+            # Security events (for SIEM)
+            security:
+                type: stream
+                path: "%kernel.logs_dir%/security.log"
+                level: info
+                channels: ["security"]
+                formatter: monolog.formatter.json
+            
+            # Audit logs (for compliance)
+            audit:
+                type: stream
+                path: "%kernel.logs_dir%/audit.log"
+                level: info
+                channels: ["audit"]
+                formatter: monolog.formatter.json
+            
+            # Performance monitoring
+            performance:
+                type: stream
+                path: "%kernel.logs_dir%/performance.log"
+                level: info
+                channels: ["performance"]
+                formatter: monolog.formatter.json
+            
+            # Error tracking (Sentry/similar)
+            sentry:
+                type: service
+                id: monolog.handler.sentry
+                level: error
+            
+            # Console errors
+            console:
+                type: console
+                process_psr_3_messages: false
+                channels: ["!event", "!doctrine"]
+            
+            # Deprecation warnings
+            deprecation:
+                type: stream
+                channels: [deprecation]
+                path: "%kernel.logs_dir%/deprecation.log"
+
+    services:
+        # JSON formatter for structured logging
+        monolog.formatter.json:
+            class: Monolog\Formatter\JsonFormatter
+            arguments:
+                - 0 # batch mode
+                - true # append newline
+                - true # ignore empty context
+                - true # include stack traces
+
+        # Sentry handler (requires sentry/sentry-symfony)
+        monolog.handler.sentry:
+            class: Sentry\Monolog\Handler
+            arguments:
+                - '@Sentry\State\HubInterface'
+                - !php/const Monolog\Logger::ERROR

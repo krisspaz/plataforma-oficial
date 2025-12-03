@@ -44,6 +44,29 @@ class AuditLog
     #[Groups(['auditlog:read', 'auditlog:write'])]
     private ?array $changes = null;
 
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    #[Groups(['auditlog:read'])]
+    private ?array $oldData = null;
+
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    #[Groups(['auditlog:read'])]
+    private ?array $newData = null;
+
+    #[ORM\Column(length: 20)]
+    #[Groups(['auditlog:read'])]
+    private string $severity = 'info';
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['auditlog:read'])]
+    private ?int $userId = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['auditlog:read'])]
+    private ?string $userEmail = null;
+
+    #[ORM\Column(length: 64)]
+    private string $signature = '';
+
     #[ORM\Column(length: 45, nullable: true)]
     #[Groups(['auditlog:read', 'auditlog:write'])]
     private ?string $ip = null;
@@ -118,6 +141,72 @@ class AuditLog
     public function setChanges(?array $changes): static
     {
         $this->changes = $changes;
+        return $this;
+    }
+
+    public function getOldData(): ?array
+    {
+        return $this->oldData;
+    }
+
+    public function setOldData(?array $oldData): static
+    {
+        $this->oldData = $oldData;
+        return $this;
+    }
+
+    public function getNewData(): ?array
+    {
+        return $this->newData;
+    }
+
+    public function setNewData(?array $newData): static
+    {
+        $this->newData = $newData;
+        return $this;
+    }
+
+    public function getSeverity(): string
+    {
+        return $this->severity;
+    }
+
+    public function setSeverity(string $severity): static
+    {
+        $this->severity = $severity;
+        return $this;
+    }
+
+    public function getUserId(): ?int
+    {
+        return $this->userId;
+    }
+
+    public function setUserId(?int $userId): static
+    {
+        $this->userId = $userId;
+        return $this;
+    }
+
+    public function getUserEmail(): ?string
+    {
+        return $this->userEmail;
+    }
+
+    public function setUserEmail(?string $userEmail): static
+    {
+        $this->userEmail = $userEmail;
+        return $this;
+    }
+
+    public function getSignature(): string
+    {
+        return $this->signature;
+    }
+
+    public function setSignature(string $signature): static
+    {
+        $this->signature = $signature;
         return $this;
     }
 

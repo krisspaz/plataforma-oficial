@@ -1,0 +1,26 @@
+# config/packages/rate_limiter.yaml
+framework:
+    rate_limiter:
+        # Login attempts limiter
+        login:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'
+            
+        # API requests limiter
+        api:
+            policy: 'fixed_window'
+            limit: 100
+            interval: '1 minute'
+            
+        # Password reset limiter
+        password_reset:
+            policy: 'sliding_window'
+            limit: 3
+            interval: '1 hour'
+            
+        # Registration limiter
+        registration:
+            policy: 'sliding_window'
+            limit: 3
+            interval: '1 hour'
