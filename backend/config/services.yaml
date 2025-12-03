@@ -1,18 +1,12 @@
-# This file is the entry point to configure your own services.
-# Files in the packages/ subdirectory configure your dependencies.
-
-# Put parameters here that don't need to change on each machine where the app is deployed
-# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
+# config/services.yaml
 parameters:
 
 services:
-    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies in your services.
-        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        autowire: true
+        autoconfigure: true
 
-    # makes classes in src/ available to be used as services
-    # this creates a service per class whose id is the fully-qualified class name
+    # Make classes in src/ available to be used as services
     App\:
         resource: '../src/'
         exclude:
@@ -20,9 +14,34 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
-    
-    App\Service\ContractService:
+    # Domain Services
+    App\Domain\Student\StudentRepositoryInterface:
+        class: App\Infrastructure\Persistence\Doctrine\DoctrineStudentRepository
+
+    # Application Services - Commands
+    App\Application\Student\Command\CreateStudentCommandHandler:
         arguments:
-            $projectDir: '%kernel.project_dir%'
+            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $passwordHasher: '@Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface'
+            $eventDispatcher: '@event_dispatcher'
+            $validator: '@validator'
+
+    # Application Services - Queries
+    App\Application\Student\Query\GetStudentByIdQueryHandler:
+        arguments:
+            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
+
+    App\Application\Student\Query\GetAllStudentsQueryHandler:
+        arguments:
+            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
+
+    # Event Listeners
+    App\Infrastructure\EventListener\StudentCreatedEventListener:
+        tags:
+            - { name: kernel.event_listener, event: student.created, method: onStudentCreated }
+
+    # Existing services
+    App\Controller\:
+        resource: '../src/Controller/'
+        tags: ['controller.service_arguments']
