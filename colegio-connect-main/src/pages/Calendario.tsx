@@ -1,125 +1,130 @@
+import { useEffect, useState } from 'react';
 import { Sidebar } from "@/components/Sidebar";
-import { CalendarEvent } from "@/components/CalendarEvent";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { scheduleService, Schedule } from "@/services/schedule.service";
+import { academicService } from "@/services/academic.service";
+import { Loader2, Clock, MapPin, User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Calendario = () => {
-  const daysOfWeek = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-  const currentMonth = "Diciembre 2025";
+  const { user } = useAuth();
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      try {
+        // First get enrollments to find section ID
+        // In a real app we might let user select which enrollment/section to view
+        const enrollments = await academicService.getMyEnrollments();
+
+        if (enrollments.length > 0) {
+          const sectionId = enrollments[0].section.id;
+          const data = await scheduleService.getMySchedule(sectionId);
+          setSchedules(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch schedule', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchedule();
+  }, [user]);
+
+  // Helper to filter schedules for selected date
+  const getSchedulesForDate = (selectedDate: Date) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = days[selectedDate.getDay()];
+
+    return schedules.filter(s => s.dayOfWeek === dayName)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  };
+
+  const selectedSchedules = date ? getSchedulesForDate(date) : [];
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64 p-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Calendario</h1>
-              <p className="text-muted-foreground">Organiza tus clases y eventos</p>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Evento
-            </Button>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-8">Calendario Académico</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-foreground">{currentMonth}</h2>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="icon">
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Seleccionar Fecha</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                className="rounded-md border"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>
+                Horario para {date?.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-7 gap-2 mb-2">
-                {daysOfWeek.map(day => (
-                  <div key={day} className="text-center text-sm font-semibold text-muted-foreground py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 35 }, (_, i) => {
-                  const day = i - 2; // Start from -2 to show previous month days
-                  const isCurrentMonth = day >= 1 && day <= 31;
-                  const isToday = day === 15;
-                  
-                  return (
-                    <button
-                      key={i}
-                      className={`
-                        aspect-square rounded-lg p-2 text-sm font-medium transition-smooth
-                        ${isCurrentMonth 
-                          ? 'text-foreground hover:bg-accent' 
-                          : 'text-muted-foreground/50'
-                        }
-                        ${isToday 
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                          : ''
-                        }
-                      `}
+              ) : selectedSchedules.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedSchedules.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="flex items-start p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
                     >
-                      {day > 0 && day <= 31 ? day : ''}
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
+                      <div className="mr-4 flex flex-col items-center justify-center min-w-[80px] text-center">
+                        <span className="text-sm font-bold text-primary">
+                          {schedule.startTime.substring(0, 5)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-sm text-muted-foreground">
+                          {schedule.endTime.substring(0, 5)}
+                        </span>
+                      </div>
 
-          <div>
-            <h2 className="text-xl font-bold text-foreground mb-4">
-              Eventos Próximos
-            </h2>
-            <div className="space-y-3">
-              <CalendarEvent
-                title="Examen Final - Matemáticas"
-                date="15 Dic"
-                time="9:00 AM"
-                location="Aula 301"
-                color="hsl(210, 85%, 45%)"
-              />
-              <CalendarEvent
-                title="Presentación Grupal"
-                date="18 Dic"
-                time="2:00 PM"
-                location="Sala de Conferencias"
-                color="hsl(175, 70%, 50%)"
-              />
-              <CalendarEvent
-                title="Tutoría de Física"
-                date="20 Dic"
-                time="4:00 PM"
-                location="Virtual - Zoom"
-                color="hsl(145, 65%, 45%)"
-              />
-              <CalendarEvent
-                title="Entrega de Proyecto"
-                date="22 Dic"
-                time="11:59 PM"
-                location="Plataforma Digital"
-                color="hsl(35, 90%, 55%)"
-              />
-              <CalendarEvent
-                title="Clase de Repaso"
-                date="23 Dic"
-                time="3:00 PM"
-                location="Aula Virtual"
-                color="hsl(280, 70%, 55%)"
-              />
-            </div>
-          </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg text-foreground">
+                          {schedule.subject.name}
+                        </h3>
+                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4" />
+                            <span>{schedule.teacher.firstName} {schedule.teacher.lastName}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            <span>{schedule.classroom || 'Aula por asignar'}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{parseInt(schedule.endTime) - parseInt(schedule.startTime)} min</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  No hay clases programadas para este día.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

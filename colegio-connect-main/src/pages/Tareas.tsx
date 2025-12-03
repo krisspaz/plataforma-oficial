@@ -1,117 +1,99 @@
 import { Sidebar } from "@/components/Sidebar";
-import { UpcomingTask } from "@/components/UpcomingTask";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
-const Tareas = () => {
+export default function Tareas() {
+  // Mock data - in a real app this would come from an API
+  const tasks = [
+    {
+      id: 1,
+      title: "Ensayo sobre Revolución Industrial",
+      course: "Historia Mundial",
+      dueDate: "2024-03-25",
+      status: "pending",
+      priority: "high"
+    },
+    {
+      id: 2,
+      title: "Ejercicios de Cálculo Cap. 4",
+      course: "Matemáticas Avanzadas",
+      dueDate: "2024-03-28",
+      status: "in_progress",
+      priority: "medium"
+    },
+    {
+      id: 3,
+      title: "Reporte de Laboratorio Física",
+      course: "Física Fundamental",
+      dueDate: "2024-03-30",
+      status: "completed",
+      priority: "low"
+    }
+  ];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500';
+      case 'in_progress': return 'bg-blue-500';
+      default: return 'bg-yellow-500';
+    }
+  };
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'high': return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'medium': return <Clock className="w-4 h-4 text-yellow-500" />;
+      default: return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64 p-8">
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Tareas</h1>
-              <p className="text-muted-foreground">Gestiona y completa tus asignaciones</p>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Tarea
-            </Button>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Tareas y Actividades</h1>
+          <p className="text-muted-foreground">Gestiona tus entregas y pendientes</p>
         </div>
 
-        <Tabs defaultValue="pendientes" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
-            <TabsTrigger value="en-progreso">En Progreso</TabsTrigger>
-            <TabsTrigger value="completadas">Completadas</TabsTrigger>
-          </TabsList>
+        <div className="grid gap-4">
+          {tasks.map((task) => (
+            <Card key={task.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6 flex items-center justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`w-2 h-16 rounded-full ${getStatusColor(task.status)}`} />
+                  <div>
+                    <h3 className="font-semibold text-lg">{task.title}</h3>
+                    <p className="text-sm text-muted-foreground">{task.course}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs">
+                        Vence: {task.dueDate}
+                      </Badge>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {getPriorityIcon(task.priority)}
+                        <span className="capitalize">{task.priority} Prioridad</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-          <TabsContent value="pendientes" className="space-y-4">
-            <UpcomingTask
-              title="Ensayo sobre Revolución Industrial"
-              course="Historia Mundial"
-              dueDate="Mañana, 11:59 PM"
-              priority="high"
-              type="Ensayo"
-            />
-            <UpcomingTask
-              title="Problemas de Cálculo Integral"
-              course="Matemáticas Avanzadas"
-              dueDate="3 días"
-              priority="medium"
-              type="Ejercicios"
-            />
-            <UpcomingTask
-              title="Lectura: Don Quijote Cap. 1-5"
-              course="Literatura Española"
-              dueDate="1 semana"
-              priority="low"
-              type="Lectura"
-            />
-            <UpcomingTask
-              title="Laboratorio de Química"
-              course="Química Orgánica"
-              dueDate="5 días"
-              priority="medium"
-              type="Laboratorio"
-            />
-            <UpcomingTask
-              title="Proyecto Final de Programación"
-              course="Programación Avanzada"
-              dueDate="2 semanas"
-              priority="high"
-              type="Proyecto"
-            />
-          </TabsContent>
-
-          <TabsContent value="en-progreso" className="space-y-4">
-            <UpcomingTask
-              title="Análisis literario - García Lorca"
-              course="Literatura Española"
-              dueDate="4 días"
-              priority="medium"
-              type="Análisis"
-            />
-            <UpcomingTask
-              title="Experimento de Física"
-              course="Física Cuántica"
-              dueDate="1 semana"
-              priority="medium"
-              type="Experimento"
-            />
-          </TabsContent>
-
-          <TabsContent value="completadas" className="space-y-4">
-            <UpcomingTask
-              title="Quiz de Historia - Edad Media"
-              course="Historia Mundial"
-              dueDate="Completado hace 2 días"
-              priority="low"
-              type="Quiz"
-            />
-            <UpcomingTask
-              title="Ejercicios de Álgebra Lineal"
-              course="Matemáticas Avanzadas"
-              dueDate="Completado hace 5 días"
-              priority="low"
-              type="Ejercicios"
-            />
-            <UpcomingTask
-              title="Presentación de Química"
-              course="Química Orgánica"
-              dueDate="Completado hace 1 semana"
-              priority="low"
-              type="Presentación"
-            />
-          </TabsContent>
-        </Tabs>
+                <div className="flex gap-2">
+                  <Badge className={
+                    task.status === 'completed' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                      task.status === 'in_progress' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
+                        'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                  }>
+                    {task.status === 'completed' ? 'Completada' :
+                      task.status === 'in_progress' ? 'En Progreso' : 'Pendiente'}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </main>
     </div>
   );
-};
-
-export default Tareas;
+}

@@ -1,191 +1,124 @@
+import { useState } from 'react';
 import { Sidebar } from "@/components/Sidebar";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+import { Loader2, User, Lock, Bell } from "lucide-react";
+import { api } from "@/services/api";
 
-const Configuracion = () => {
+export default function Configuracion() {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // await api.put('/profile', formData);
+      toast.success("Perfil actualizado correctamente");
+    } catch (error) {
+      toast.error("Error al actualizar perfil");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64 p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Configuración</h1>
-          <p className="text-muted-foreground">Personaliza tu experiencia educativa</p>
+          <p className="text-muted-foreground">Administra tu cuenta y preferencias</p>
         </div>
 
-        <Tabs defaultValue="perfil" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="perfil">Perfil</TabsTrigger>
-            <TabsTrigger value="notificaciones">Notificaciones</TabsTrigger>
-            <TabsTrigger value="privacidad">Privacidad</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="perfil">
-            <div className="max-w-2xl space-y-6">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Información Personal</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-6 mb-6">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-primary-foreground">
-                      JD
-                    </div>
-                    <Button variant="outline">Cambiar foto</Button>
+        <div className="grid gap-6 max-w-2xl">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                <CardTitle>Información Personal</CardTitle>
+              </div>
+              <CardDescription>Actualiza tus datos de contacto</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Nombre</Label>
+                    <Input id="firstName" defaultValue={user?.firstName} />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="nombre">Nombre</Label>
-                      <Input id="nombre" defaultValue="Juan" />
-                    </div>
-                    <div>
-                      <Label htmlFor="apellido">Apellido</Label>
-                      <Input id="apellido" defaultValue="Díaz" />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Apellido</Label>
+                    <Input id="lastName" defaultValue={user?.lastName} />
                   </div>
-
-                  <div>
-                    <Label htmlFor="email">Correo Electrónico</Label>
-                    <Input id="email" type="email" defaultValue="juan.diaz@estudiante.edu" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="telefono">Teléfono</Label>
-                    <Input id="telefono" defaultValue="+34 600 123 456" />
-                  </div>
-
-                  <Button className="w-full">Guardar Cambios</Button>
                 </div>
-              </Card>
 
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Cambiar Contraseña</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="password-actual">Contraseña Actual</Label>
-                    <Input id="password-actual" type="password" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="password-nueva">Nueva Contraseña</Label>
-                    <Input id="password-nueva" type="password" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="password-confirmar">Confirmar Contraseña</Label>
-                    <Input id="password-confirmar" type="password" />
-                  </div>
-
-                  <Button className="w-full">Actualizar Contraseña</Button>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Correo Electrónico</Label>
+                  <Input id="email" type="email" defaultValue={user?.email} disabled />
+                  <p className="text-xs text-muted-foreground">
+                    Contacta a administración para cambiar tu correo
+                  </p>
                 </div>
-              </Card>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="notificaciones">
-            <div className="max-w-2xl">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Preferencias de Notificaciones</h3>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Notificaciones de Tareas</p>
-                      <p className="text-sm text-muted-foreground">Recibe alertas sobre nuevas tareas y fechas límite</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Guardar Cambios
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Recordatorios de Clases</p>
-                      <p className="text-sm text-muted-foreground">Avisos antes de que comience una clase</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-primary" />
+                <CardTitle>Seguridad</CardTitle>
+              </div>
+              <CardDescription>Cambia tu contraseña y seguridad</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Contraseña Actual</Label>
+                <Input id="current-password" type="password" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nueva Contraseña</Label>
+                <Input id="new-password" type="password" />
+              </div>
+              <Button variant="outline">Actualizar Contraseña</Button>
+            </CardContent>
+          </Card>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Mensajes de Comunidad</p>
-                      <p className="text-sm text-muted-foreground">Notificaciones de nuevas publicaciones y comentarios</p>
-                    </div>
-                    <Switch />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Actualizaciones de Calificaciones</p>
-                      <p className="text-sm text-muted-foreground">Alertas cuando se publiquen nuevas calificaciones</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Newsletter Educativo</p>
-                      <p className="text-sm text-muted-foreground">Recursos y consejos de estudio semanales</p>
-                    </div>
-                    <Switch />
-                  </div>
-
-                  <Button className="w-full">Guardar Preferencias</Button>
-                </div>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="privacidad">
-            <div className="max-w-2xl">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Configuración de Privacidad</h3>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Perfil Público</p>
-                      <p className="text-sm text-muted-foreground">Permite que otros estudiantes vean tu perfil</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Mostrar Progreso Académico</p>
-                      <p className="text-sm text-muted-foreground">Muestra tus logros y calificaciones en tu perfil</p>
-                    </div>
-                    <Switch />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Permitir Mensajes Directos</p>
-                      <p className="text-sm text-muted-foreground">Otros usuarios pueden enviarte mensajes privados</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Compartir Horario de Clases</p>
-                      <p className="text-sm text-muted-foreground">Permite a compañeros ver tu horario</p>
-                    </div>
-                    <Switch />
-                  </div>
-
-                  <Button className="w-full">Guardar Configuración</Button>
-                </div>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                <CardTitle>Notificaciones</CardTitle>
+              </div>
+              <CardDescription>Gestiona tus alertas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between py-2">
+                <Label htmlFor="email-notifs">Notificaciones por Correo</Label>
+                <input type="checkbox" id="email-notifs" className="toggle" defaultChecked />
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <Label htmlFor="push-notifs">Notificaciones Push</Label>
+                <input type="checkbox" id="push-notifs" className="toggle" defaultChecked />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
-};
-
-export default Configuracion;
+}

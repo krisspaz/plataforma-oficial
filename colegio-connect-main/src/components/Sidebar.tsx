@@ -1,17 +1,51 @@
-import { Home, BookOpen, Calendar, CheckSquare, Users, Settings, GraduationCap } from "lucide-react";
+import { Home, BookOpen, Calendar, CheckSquare, Users, Settings, GraduationCap, LogOut, FileText, DollarSign, UserCheck } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { icon: Home, label: "Inicio", path: "/" },
-  { icon: BookOpen, label: "Mis Cursos", path: "/cursos" },
-  { icon: Calendar, label: "Calendario", path: "/calendario" },
-  { icon: CheckSquare, label: "Tareas", path: "/tareas" },
-  { icon: Users, label: "Comunidad", path: "/comunidad" },
-  { icon: Settings, label: "Configuración", path: "/configuracion" },
-];
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "./ui/button";
 
 export const Sidebar = () => {
+  const { user, logout } = useAuth();
+
+  const getNavItems = () => {
+    const common = [
+      { icon: Home, label: "Inicio", path: "/" },
+      { icon: Settings, label: "Configuración", path: "/configuracion" },
+    ];
+
+    if (user?.roles.includes('ROLE_ADMIN') || user?.roles.includes('ROLE_ADMIN_SISTEMAS')) {
+      return [
+        { icon: Home, label: "Dashboard", path: "/dashboard" },
+        { icon: Users, label: "Usuarios", path: "/usuarios" },
+        { icon: GraduationCap, label: "Académico", path: "/academico" },
+        { icon: DollarSign, label: "Pagos", path: "/pagos" },
+        { icon: Settings, label: "Configuración", path: "/configuracion" },
+      ];
+    }
+
+    if (user?.roles.includes('ROLE_MAESTRO')) {
+      return [
+        { icon: Home, label: "Inicio", path: "/" },
+        { icon: BookOpen, label: "Mis Clases", path: "/cursos" },
+        { icon: UserCheck, label: "Asistencia", path: "/asistencia" },
+        { icon: Calendar, label: "Calendario", path: "/calendario" },
+        { icon: Settings, label: "Configuración", path: "/configuracion" },
+      ];
+    }
+
+    // Default (Student/Parent)
+    return [
+      { icon: Home, label: "Inicio", path: "/" },
+      { icon: BookOpen, label: "Mis Cursos", path: "/cursos" },
+      { icon: Calendar, label: "Calendario", path: "/calendario" },
+      { icon: CheckSquare, label: "Tareas", path: "/tareas" },
+      { icon: Users, label: "Comunidad", path: "/comunidad" },
+      { icon: Settings, label: "Configuración", path: "/configuracion" },
+    ];
+  };
+
+  const navItems = getNavItems();
+
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="p-6 border-b border-sidebar-border">
@@ -20,8 +54,8 @@ export const Sidebar = () => {
             <GraduationCap className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">EduPlat</h1>
-            <p className="text-xs text-sidebar-foreground/60">Portal Estudiantil</p>
+            <h1 className="text-lg font-bold text-sidebar-foreground">Oxford</h1>
+            <p className="text-xs text-sidebar-foreground/60">Portal Educativo</p>
           </div>
         </div>
       </div>
@@ -45,15 +79,28 @@ export const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent mb-2">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center text-sm font-semibold text-primary-foreground">
-            JD
+            {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">Juan Díaz</p>
-            <p className="text-xs text-sidebar-foreground/60 truncate">Estudiante</p>
+            <p className="text-sm font-medium text-sidebar-foreground truncate">
+              {user?.firstName} {user?.lastName}
+            </p>
+            <p className="text-xs text-sidebar-foreground/60 truncate">
+              {user?.roles.includes('ROLE_ADMIN') ? 'Administrador' :
+                user?.roles.includes('ROLE_MAESTRO') ? 'Maestro' : 'Estudiante'}
+            </p>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50"
+          onClick={logout}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Cerrar Sesión
+        </Button>
       </div>
     </aside>
   );

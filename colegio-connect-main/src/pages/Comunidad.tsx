@@ -1,173 +1,214 @@
+import { useEffect, useState, useRef } from 'react';
 import { Sidebar } from "@/components/Sidebar";
 import { Card } from "@/components/ui/card";
-import { Avatar } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ThumbsUp, Share2, Users } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { chatService, ChatRoom, ChatMessage } from "@/services/chat.service";
+import { useAuth } from "@/context/AuthContext";
+import { Send, Search, MoreVertical, Phone, Video } from "lucide-react";
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const Comunidad = () => {
+  const { user } = useAuth();
+  const [rooms, setRooms] = useState<ChatRoom[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchRooms();
+    // Poll for new rooms/unread counts every 30s
+    const interval = setInterval(fetchRooms, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (selectedRoom) {
+      fetchMessages(selectedRoom.id);
+      // Poll for new messages every 5s
+      const interval = setInterval(() => fetchMessages(selectedRoom.id), 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedRoom]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const fetchRooms = async () => {
+    try {
+      const data = await chatService.getRooms();
+      setRooms(data);
+    } catch (error) {
+      console.error('Failed to fetch rooms', error);
+    }
+  };
+
+  const fetchMessages = async (roomId: number) => {
+    try {
+      const data = await chatService.getMessages(roomId);
+      setMessages(data);
+    } catch (error) {
+      console.error('Failed to fetch messages', error);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRoom || !newMessage.trim()) return;
+
+    try {
+      const message = await chatService.sendMessage(selectedRoom.id, newMessage);
+      setMessages([...messages, message]);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send message', error);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
-      
-      <main className="flex-1 ml-64 p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Comunidad</h1>
-          <p className="text-muted-foreground">Conecta con compañeros y profesores</p>
+
+      <main className="flex-1 ml-64 flex">
+        {/* Chat List */}
+        <div className="w-80 border-r bg-card flex flex-col">
+          <div className="p-4 border-b">
+            <h1 className="text-xl font-bold mb-4">Mensajes</h1>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Buscar conversación..." className="pl-9" />
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-2">
+              {rooms.map((room) => (
+                <div
+                  key={room.id}
+                  onClick={() => setSelectedRoom(room)}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${selectedRoom?.id === room.id ? 'bg-accent' : 'hover:bg-accent/50'
+                    }`}
+                >
+                  <Avatar>
+                    <AvatarFallback>
+                      {room.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium truncate">{room.name}</h3>
+                      {room.lastMessage && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(room.lastMessage.createdAt), 'HH:mm')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {room.lastMessage?.content || 'Sin mensajes'}
+                    </p>
+                  </div>
+                  {room.unreadCount > 0 && (
+                    <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                      {room.unreadCount}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Post 1 */}
-            <Card className="p-6">
-              <div className="flex gap-4 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold">
-                  AG
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Ana García</h3>
-                  <p className="text-sm text-muted-foreground">Profesora • Hace 2 horas</p>
-                </div>
-              </div>
-              
-              <p className="text-foreground mb-4">
-                ¡Hola estudiantes! Les comparto algunos recursos adicionales sobre cálculo integral. 
-                Estos ejercicios les ayudarán a prepararse mejor para el examen final. 📚
-              </p>
-
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>24</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>8 comentarios</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <Share2 className="w-4 h-4" />
-                  <span>Compartir</span>
-                </button>
-              </div>
-            </Card>
-
-            {/* Post 2 */}
-            <Card className="p-6">
-              <div className="flex gap-4 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-success flex items-center justify-center text-accent-foreground font-semibold">
-                  ML
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">María López</h3>
-                  <p className="text-sm text-muted-foreground">Estudiante • Hace 5 horas</p>
-                </div>
-              </div>
-              
-              <p className="text-foreground mb-4">
-                ¿Alguien más está trabajando en el proyecto de Física? Me gustaría formar un grupo 
-                de estudio para las sesiones de la próxima semana. 🤝
-              </p>
-
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>15</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>12 comentarios</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <Share2 className="w-4 h-4" />
-                  <span>Compartir</span>
-                </button>
-              </div>
-            </Card>
-
-            {/* Post 3 */}
-            <Card className="p-6">
-              <div className="flex gap-4 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-warning to-destructive flex items-center justify-center text-warning-foreground font-semibold">
-                  CR
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Carlos Ruiz</h3>
-                  <p className="text-sm text-muted-foreground">Profesor • Hace 1 día</p>
-                </div>
-              </div>
-              
-              <p className="text-foreground mb-4">
-                Recordatorio: La fecha límite para la entrega del ensayo sobre la Generación del 98 
-                es este viernes. No olviden incluir la bibliografía completa. ✍️
-              </p>
-
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>42</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>5 comentarios</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-primary transition-smooth">
-                  <Share2 className="w-4 h-4" />
-                  <span>Compartir</span>
-                </button>
-              </div>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="font-bold text-foreground mb-4">Grupos Activos</h3>
-              <div className="space-y-4">
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col bg-background">
+          {selectedRoom ? (
+            <>
+              {/* Chat Header */}
+              <div className="p-4 border-b flex items-center justify-between bg-card">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">Matemáticas 2025</p>
-                    <p className="text-xs text-muted-foreground">156 miembros</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">Club de Física</p>
-                    <p className="text-xs text-muted-foreground">89 miembros</p>
+                  <Avatar>
+                    <AvatarFallback>
+                      {selectedRoom.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="font-bold">{selectedRoom.name}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedRoom.participants.length} participantes
+                    </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-success" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">Literatura y Debate</p>
-                    <p className="text-xs text-muted-foreground">124 miembros</p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon"><Phone className="w-5 h-5" /></Button>
+                  <Button variant="ghost" size="icon"><Video className="w-5 h-5" /></Button>
+                  <Button variant="ghost" size="icon"><MoreVertical className="w-5 h-5" /></Button>
                 </div>
               </div>
-              
-              <Button variant="outline" className="w-full mt-4">
-                Ver todos los grupos
-              </Button>
-            </Card>
 
-            <Card className="p-6">
-              <h3 className="font-bold text-foreground mb-4">Sugerencias</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Conecta con más estudiantes y profesores de tu institución
-              </p>
-              <Button className="w-full">
-                Explorar perfiles
-              </Button>
-            </Card>
-          </div>
+              {/* Messages */}
+              <ScrollArea className="flex-1 p-4">
+                <div className="space-y-4">
+                  {messages.map((msg) => {
+                    const isMe = msg.sender.id === user?.id;
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[70%] rounded-2xl p-3 ${isMe
+                              ? 'bg-primary text-primary-foreground rounded-tr-none'
+                              : 'bg-accent rounded-tl-none'
+                            }`}
+                        >
+                          {!isMe && (
+                            <p className="text-xs font-medium mb-1 opacity-70">
+                              {msg.sender.firstName}
+                            </p>
+                          )}
+                          <p>{msg.content}</p>
+                          <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                            }`}>
+                            {format(new Date(msg.createdAt), 'HH:mm')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={scrollRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Input Area */}
+              <div className="p-4 bg-card border-t">
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Escribe un mensaje..."
+                    className="flex-1"
+                  />
+                  <Button type="submit" size="icon" disabled={!newMessage.trim()}>
+                    <Send className="w-5 h-5" />
+                  </Button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mb-4">
+                <Search className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Selecciona una conversación</h3>
+              <p>Elige un chat de la lista para comenzar a escribir</p>
+            </div>
+          )}
         </div>
       </main>
     </div>
