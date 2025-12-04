@@ -1,73 +1,348 @@
-# Welcome to your Lovable project
+# Frontend - Plataforma Escolar
 
-## Project info
+Sistema de gestión escolar moderno y completo con interfaces específicas para cada rol de usuario.
 
-**URL**: https://lovable.dev/projects/d4801626-06ae-463e-bffc-8b4ddad5c3f8
+## 📋 Tabla de Contenidos
 
-## How can I edit this code?
+- [Características](#características)
+- [Tecnologías](#tecnologías)
+- [Estructura del Proyecto](#estructura-del-proyecto)
+- [Instalación](#instalación)
+- [Configuración](#configuración)
+- [Módulos por Rol](#módulos-por-rol)
+- [Seguridad](#seguridad)
+- [API](#api)
+- [Testing](#testing)
+- [Despliegue](#despliegue)
 
-There are several ways of editing your application.
+## ✨ Características
 
-**Use Lovable**
+### Generales
+- ✅ TypeScript strict mode
+- ✅ Autenticación JWT
+- ✅ Routing protegido por roles
+- ✅ Error boundaries
+- ✅ Loading states
+- ✅ Toast notifications
+- ✅ Responsive design
+- ✅ Dark mode ready
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d4801626-06ae-463e-bffc-8b4ddad5c3f8) and start prompting.
+### Seguridad
+- ✅ CSRF protection
+- ✅ XSS prevention
+- ✅ Input sanitization
+- ✅ Rate limiting
+- ✅ Secure token storage
+- ✅ Password strength validation
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tecnologías
 
-**Use your preferred IDE**
+- **React 18** - Framework UI
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Shadcn UI** - Component library
+- **React Router** - Routing
+- **React Query** - Data fetching
+- **React Hook Form** - Form handling
+- **Zod** - Validation
+- **date-fns** - Date utilities
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 📁 Estructura del Proyecto
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```
+frontend/
+├── src/
+│   ├── components/          # Componentes reutilizables
+│   │   ├── ui/             # Componentes Shadcn UI
+│   │   ├── Sidebar.tsx     # Navegación lateral
+│   │   ├── StatCard.tsx    # Tarjetas de estadísticas
+│   │   └── ErrorBoundary.tsx
+│   │
+│   ├── pages/              # Páginas principales
+│   │   ├── dashboards/     # Dashboards por rol
+│   │   ├── secretaria/     # Módulo Secretaría
+│   │   ├── coordinacion/   # Módulo Coordinación
+│   │   ├── maestros/       # Módulo Maestros
+│   │   ├── padres/         # Módulo Padres
+│   │   └── administracion/ # Módulo Administración
+│   │
+│   ├── services/           # Servicios API
+│   │   ├── api.ts          # Cliente API base
+│   │   ├── auth.service.ts
+│   │   ├── secretaria.service.ts
+│   │   ├── coordinacion.service.ts
+│   │   ├── maestros.service.ts
+│   │   ├── padres.service.ts
+│   │   └── administracion.service.ts
+│   │
+│   ├── types/              # TypeScript types
+│   │   ├── auth.types.ts
+│   │   └── modules.types.ts
+│   │
+│   ├── lib/                # Utilidades
+│   │   ├── errorHandler.ts
+│   │   ├── security.ts
+│   │   ├── sanitize.ts
+│   │   └── utils.ts
+│   │
+│   ├── context/            # React Context
+│   │   └── AuthContext.tsx
+│   │
+│   └── App.tsx             # Componente principal
+│
+├── public/                 # Archivos estáticos
+├── .env.example           # Variables de entorno ejemplo
+└── package.json
+```
 
-Follow these steps:
+## 🚀 Instalación
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# Clonar repositorio
+git clone <repository-url>
+cd frontend
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Instalar dependencias
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Copiar variables de entorno
+cp .env.example .env
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Iniciar servidor de desarrollo
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## ⚙️ Configuración
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Variables de Entorno
 
-**Use GitHub Codespaces**
+```env
+VITE_API_URL=http://localhost:8000/api
+VITE_APP_NAME=Plataforma Escolar
+VITE_ENABLE_ANALYTICS=false
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### TypeScript
 
-## What technologies are used for this project?
+El proyecto usa TypeScript en modo estricto:
+- `strict: true`
+- `noImplicitAny: true`
+- `strictNullChecks: true`
 
-This project is built with:
+## 👥 Módulos por Rol
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 🏢 Secretaría
+**Funcionalidades:**
+- Registro de pagos (contado/crédito)
+- Generación de contratos PDF
+- Inscripción de estudiantes
+- Reporte de deudores
+- Corte del día
 
-## How can I deploy this project?
+**Rutas:**
+- `/secretaria` - Dashboard
+- `/secretaria/pagos/nuevo` - Nuevo pago
+- `/secretaria/pagos/deudores` - Reporte deudores
+- `/secretaria/inscripciones/nueva` - Nueva inscripción
+- `/secretaria/contratos/generar` - Generar contrato
 
-Simply open [Lovable](https://lovable.dev/projects/d4801626-06ae-463e-bffc-8b4ddad5c3f8) and click on Share -> Publish.
+### 📚 Coordinación
+**Funcionalidades:**
+- Gestión de anuncios
+- Base de datos de profesores
+- Asignación de materias
+- Gestión de notas y boletas
+- Cierre de bimestre
 
-## Can I connect a custom domain to my Lovable project?
+**Rutas:**
+- `/coordinacion` - Dashboard
+- `/coordinacion/anuncios/nuevo` - Nuevo anuncio
+- `/coordinacion/profesores` - Gestión profesores
+- `/coordinacion/notas` - Gestión notas
 
-Yes, you can!
+### 👨‍🏫 Maestros
+**Funcionalidades:**
+- Crear actividades (tareas/exámenes)
+- Cargar notas
+- Subir materiales
+- Ver calendario
+- Notas finales
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+**Rutas:**
+- `/maestros` - Dashboard
+- `/maestros/actividades/nueva` - Nueva actividad
+- `/maestros/notas/cargar` - Cargar notas
+- `/maestros/materiales` - Materiales
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### 👨‍👩‍👧‍👦 Padres
+**Funcionalidades:**
+- Ver saldo y pagos
+- Tareas de hijos
+- Descargar contratos
+- Historial de pagos
+
+**Rutas:**
+- `/padres` - Dashboard
+- `/padres/cuenta` - Mi cuenta
+- `/padres/tareas` - Tareas hijos
+
+### 💼 Administración
+**Funcionalidades:**
+- Resumen financiero
+- Estadísticas estudiantes
+- Reportes
+- Corte del día
+
+**Rutas:**
+- `/administracion` - Dashboard
+- `/administracion/finanzas` - Finanzas
+- `/administracion/estadisticas` - Estadísticas
+
+## 🔒 Seguridad
+
+### Implementaciones de Seguridad
+
+#### 1. Sanitización de Inputs
+```typescript
+import { sanitizeHtml, sanitizeInput } from '@/lib/sanitize';
+
+const cleanInput = sanitizeInput(userInput);
+```
+
+#### 2. CSRF Protection
+```typescript
+import { generateCSRFToken, storeCSRFToken } from '@/lib/security';
+
+const token = generateCSRFToken();
+storeCSRFToken(token);
+```
+
+#### 3. Rate Limiting
+```typescript
+import { rateLimiter } from '@/lib/security';
+
+if (!rateLimiter.isAllowed(endpoint)) {
+  throw new Error('Too many requests');
+}
+```
+
+#### 4. Secure Storage
+```typescript
+import { secureStorage } from '@/lib/security';
+
+secureStorage.setItem('key', 'value');
+const value = secureStorage.getItem('key');
+```
+
+### Best Practices
+
+- ✅ Todos los inputs son sanitizados
+- ✅ Tokens JWT validados y verificados
+- ✅ CSRF tokens en requests mutables
+- ✅ Rate limiting en API calls
+- ✅ Validación de contraseñas
+- ✅ Prevención de clickjacking
+- ✅ Content Security Policy
+
+## 📡 API
+
+### Cliente API
+
+El cliente API (`services/api.ts`) incluye:
+- Manejo automático de tokens
+- CSRF protection
+- Rate limiting
+- Error handling
+- Logging
+
+### Ejemplo de Uso
+
+```typescript
+import { api } from '@/services/api';
+
+// GET request
+const data = await api.get<User[]>('/users');
+
+// POST request
+const newUser = await api.post<User>('/users', {
+  name: 'John Doe',
+  email: 'john@example.com'
+});
+```
+
+### Servicios por Módulo
+
+Cada módulo tiene su propio servicio:
+- `secretaria.service.ts`
+- `coordinacion.service.ts`
+- `maestros.service.ts`
+- `padres.service.ts`
+- `administracion.service.ts`
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests
+npm run test
+
+# Tests con coverage
+npm run test:coverage
+
+# Tests E2E
+npm run test:e2e
+```
+
+## 📦 Despliegue
+
+### Build de Producción
+
+```bash
+# Crear build
+npm run build
+
+# Preview del build
+npm run preview
+```
+
+### Variables de Entorno Producción
+
+```env
+VITE_API_URL=https://api.production.com
+VITE_APP_NAME=Plataforma Escolar
+VITE_ENABLE_ANALYTICS=true
+```
+
+### Optimizaciones
+
+- Code splitting automático
+- Lazy loading de rutas
+- Tree shaking
+- Minificación
+- Compresión gzip
+
+## 📝 Scripts Disponibles
+
+```bash
+npm run dev          # Servidor desarrollo
+npm run build        # Build producción
+npm run preview      # Preview build
+npm run lint         # Linter
+npm run type-check   # Verificar tipos
+```
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crea tu rama (`git checkout -b feature/AmazingFeature`)
+3. Commit cambios (`git commit -m 'Add AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto es privado y confidencial.
+
+## 👨‍💻 Soporte
+
+Para soporte, contacta al equipo de desarrollo.

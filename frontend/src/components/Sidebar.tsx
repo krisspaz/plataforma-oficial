@@ -8,32 +8,63 @@ export const Sidebar = () => {
   const { user, logout } = useAuth();
 
   const getNavItems = () => {
-    const common = [
-      { icon: Home, label: "Inicio", path: "/" },
-      { icon: Settings, label: "Configuración", path: "/configuracion" },
-    ];
-
+    // Administración y Admin de Sistemas
     if (user?.roles.includes('ROLE_ADMIN') || user?.roles.includes('ROLE_ADMIN_SISTEMAS')) {
       return [
         { icon: Home, label: "Dashboard", path: "/dashboard" },
-        { icon: Users, label: "Usuarios", path: "/usuarios" },
-        { icon: GraduationCap, label: "Académico", path: "/academico" },
-        { icon: DollarSign, label: "Pagos", path: "/pagos" },
+        { icon: DollarSign, label: "Finanzas", path: "/administracion/finanzas" },
+        { icon: Users, label: "Estadísticas", path: "/administracion/estadisticas" },
+        { icon: FileText, label: "Reportes", path: "/administracion/reportes" },
         { icon: Settings, label: "Configuración", path: "/configuracion" },
       ];
     }
 
+    // Secretaría
+    if (user?.roles.includes('ROLE_SECRETARIA')) {
+      return [
+        { icon: Home, label: "Dashboard", path: "/dashboard" },
+        { icon: DollarSign, label: "Pagos", path: "/secretaria/pagos" },
+        { icon: Users, label: "Inscripciones", path: "/secretaria/inscripciones" },
+        { icon: FileText, label: "Contratos", path: "/secretaria/contratos" },
+        { icon: Settings, label: "Configuración", path: "/configuracion" },
+      ];
+    }
+
+    // Coordinación
+    if (user?.roles.includes('ROLE_COORDINACION')) {
+      return [
+        { icon: Home, label: "Dashboard", path: "/dashboard" },
+        { icon: Users, label: "Profesores", path: "/coordinacion/profesores" },
+        { icon: BookOpen, label: "Materias", path: "/coordinacion/materias" },
+        { icon: GraduationCap, label: "Notas", path: "/coordinacion/notas" },
+        { icon: Settings, label: "Configuración", path: "/configuracion" },
+      ];
+    }
+
+    // Maestros
     if (user?.roles.includes('ROLE_MAESTRO')) {
       return [
         { icon: Home, label: "Inicio", path: "/" },
-        { icon: BookOpen, label: "Mis Clases", path: "/cursos" },
-        { icon: UserCheck, label: "Asistencia", path: "/asistencia" },
-        { icon: Calendar, label: "Calendario", path: "/calendario" },
+        { icon: BookOpen, label: "Actividades", path: "/maestros/actividades" },
+        { icon: CheckSquare, label: "Notas", path: "/maestros/notas" },
+        { icon: FileText, label: "Materiales", path: "/maestros/materiales" },
+        { icon: Calendar, label: "Calendario", path: "/maestros/calendario" },
         { icon: Settings, label: "Configuración", path: "/configuracion" },
       ];
     }
 
-    // Default (Student/Parent)
+    // Padres
+    if (user?.roles.includes('ROLE_PADRE_FAMILIA')) {
+      return [
+        { icon: Home, label: "Inicio", path: "/" },
+        { icon: DollarSign, label: "Mi Cuenta", path: "/padres/cuenta" },
+        { icon: CheckSquare, label: "Tareas", path: "/padres/tareas" },
+        { icon: FileText, label: "Contratos", path: "/padres/contratos" },
+        { icon: Settings, label: "Configuración", path: "/configuracion" },
+      ];
+    }
+
+    // Estudiantes (default)
     return [
       { icon: Home, label: "Inicio", path: "/" },
       { icon: BookOpen, label: "Mis Cursos", path: "/cursos" },

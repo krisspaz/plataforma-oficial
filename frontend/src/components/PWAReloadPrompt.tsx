@@ -1,5 +1,4 @@
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { Button } from '@/components/ui/button'
 import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/components/ui/use-toast'
 import { useEffect } from 'react'
@@ -10,11 +9,11 @@ export function PWAReloadPrompt() {
         needRefresh: [needRefresh, setNeedRefresh],
         updateServiceWorker,
     } = useRegisterSW({
-        onRegistered(r) {
-            console.log('SW Registered: ' + r)
+        onRegistered() {
+            // SW Registered successfully
         },
-        onRegisterError(error) {
-            console.log('SW registration error', error)
+        onRegisterError() {
+            // SW registration error
         },
     })
 

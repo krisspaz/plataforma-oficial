@@ -6,8 +6,8 @@ doctrine_migrations:
     # No permitir el profiler en production (buena práctica)
     enable_profiler: false
 
-    # Organización de carpetas por año (recomendado)
-    organizing_migrations: true
+    # Organiza las migraciones por año/mes para mejor mantenimiento
+    organize_migrations: 'BY_YEAR'
 
     # Evita que se generen migraciones vacías por cambios irrelevantes de metadata
     check_database_platform: true

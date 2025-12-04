@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
+import { errorHandler } from '@/lib/errorHandler';
+
 const loginSchema = z.object({
     email: z.string().email('Correo electrónico inválido'),
     password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
@@ -40,8 +42,7 @@ export default function Login() {
             toast.success('Inicio de sesión exitoso');
             navigate('/dashboard');
         } catch (error) {
-            console.error(error);
-            toast.error('Credenciales incorrectas o error en el servidor');
+            errorHandler.handleApiError(error, 'Credenciales incorrectas');
         } finally {
             setIsLoading(false);
         }

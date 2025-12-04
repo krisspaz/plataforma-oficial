@@ -1,7 +1,7 @@
 twig:
     file_name_pattern: '*.twig'
-    # Evita renderizar archivos ajenos a Twig y mejora rendimiento
-    autoescape: 'name'
+    # Evita renderizar archivos ajenos a Ttwig:
+    default_path: '%kernel.project_dir%/templates'
     # Cache activado por defecto en prod (Symfony lo maneja solo)
     debug: '%kernel.debug%'
     strict_variables: false

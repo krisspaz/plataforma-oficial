@@ -21,6 +21,12 @@ export interface AIRiskScore {
     };
 }
 
+export interface BatchRiskResponse {
+    results: AIRiskScore[];
+    processed: number;
+    failed: number;
+}
+
 export const aiService = {
     getStudentRisk: async (studentId: number): Promise<AIRiskScore> => {
         return api.get<AIRiskScore>(`/ai/risk/student/${studentId}`);
@@ -30,7 +36,7 @@ export const aiService = {
         return api.get<{ students: AIRiskScore[], count: number }>('/ai/risk/high-risk');
     },
 
-    calculateBatchRisk: async (studentIds: number[]): Promise<any> => {
-        return api.post('/ai/risk/batch-calculate', { studentIds });
+    calculateBatchRisk: async (studentIds: number[]): Promise<BatchRiskResponse> => {
+        return api.post<BatchRiskResponse>('/ai/risk/batch-calculate', { studentIds });
     }
 };

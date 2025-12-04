@@ -44,7 +44,7 @@ export default defineConfig({
         enabled: true,
         type: 'module',
       },
-    }), ,
+    }),
   ],
   build: {
     rollupOptions: {

@@ -16,10 +16,7 @@ api_platform:
     enable_docs: '%kernel.debug%'
 
     graphql:
-        enabled: true
-        graphiql:
-            enabled: '%kernel.debug%'
-        default_ide: 'graphiql'
+        enabled: false
 
     defaults:
         pagination_enabled: true
@@ -45,6 +42,3 @@ api_platform:
 
     mapping:
         paths: ['%kernel.project_dir%/src/Entity']
-
-    csrf:
-        enabled: false

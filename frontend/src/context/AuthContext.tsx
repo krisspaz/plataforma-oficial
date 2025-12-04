@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, AuthState } from '../types/auth.types';
 import { authService } from '../services/auth.service';
+import { errorHandler } from '../lib/errorHandler';
 
 interface AuthContextType extends AuthState {
     login: (token: string) => Promise<void>;
@@ -30,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         isLoading: false,
                     });
                 } catch (error) {
-                    console.error('Failed to fetch user', error);
+                    errorHandler.logError(error, 'Auth initialization');
                     localStorage.removeItem('token');
                     setState({
                         user: null,
@@ -58,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: false,
             });
         } catch (error) {
-            console.error('Login failed', error);
+            errorHandler.logError(error, 'Login');
             throw error;
         }
     };
