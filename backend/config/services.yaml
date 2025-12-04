@@ -1,12 +1,14 @@
 # config/services.yaml
 parameters:
+    # Puedes definir aquí parámetros globales reutilizables si los necesitas
 
 services:
     _defaults:
-        autowire: true
-        autoconfigure: true
+        autowire: true      # Symfony resolverá automáticamente las dependencias
+        autoconfigure: true # Symfony aplicará automáticamente tags como controller.service_arguments, event_listener, etc.
+        public: false       # Por default, todos los servicios son privados (buena práctica)
 
-    # Make classes in src/ available to be used as services
+    # Exponer todos los servicios de src/ excepto lo que no deba ser tratado como servicio
     App\:
         resource: '../src/'
         exclude:
@@ -14,7 +16,7 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Domain Services
+    # Repositorios de dominio (interface → implementación)
     App\Domain\Student\StudentRepositoryInterface:
         class: App\Infrastructure\Persistence\Doctrine\DoctrineStudentRepository
 
@@ -41,7 +43,9 @@ services:
         tags:
             - { name: kernel.event_listener, event: student.created, method: onStudentCreated }
 
-    # Existing services
+    # Controllers (ya están autoconfigurados por default, pero explicitar el tag no está mal)
     App\Controller\:
         resource: '../src/Controller/'
         tags: ['controller.service_arguments']
+
+ 

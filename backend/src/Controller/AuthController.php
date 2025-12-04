@@ -19,9 +19,40 @@ class AuthController extends AbstractController
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
         private ValidatorInterface $validator
-    ) {
+    ) {}
+
+    // ===== Helpers =====
+    private function respond(mixed $data, int $status = 200): JsonResponse
+    {
+        return $this->json($data, $status);
     }
 
+    private function respondNotAuthenticated(): JsonResponse
+    {
+        return $this->respond(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+    }
+
+    private function respondBadRequest(string $message): JsonResponse
+    {
+        return $this->respond(['error' => $message], Response::HTTP_BAD_REQUEST);
+    }
+
+    private function validateEntity(object $entity): ?JsonResponse
+    {
+        $errors = $this->validator->validate($entity);
+        if (count($errors) === 0) {
+            return null;
+        }
+
+        $errorMessages = [];
+        foreach ($errors as $error) {
+            $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+        }
+
+        return $this->respond(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
+    }
+
+    // ===== REGISTER =====
     #[Route('/register', name: 'api_register', methods: ['POST'])]
     public function register(Request $request): JsonResponse
     {
@@ -33,26 +64,19 @@ class AuthController extends AbstractController
         $user->setLastName($data['lastName'] ?? '');
         $user->setPhone($data['phone'] ?? null);
         $user->setRoles($data['roles'] ?? ['ROLE_USER']);
-        
+
         if (isset($data['password'])) {
-            $user->setPassword(
-                $this->passwordHasher->hashPassword($user, $data['password'])
-            );
+            $user->setPassword($this->passwordHasher->hashPassword($user, $data['password']));
         }
 
-        $errors = $this->validator->validate($user);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
+        if ($validationResponse = $this->validateEntity($user)) {
+            return $validationResponse;
         }
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        return $this->json([
+        return $this->respond([
             'message' => 'User registered successfully',
             'user' => [
                 'id' => $user->getId(),
@@ -63,16 +87,14 @@ class AuthController extends AbstractController
         ], Response::HTTP_CREATED);
     }
 
+    // ===== GET CURRENT USER =====
     #[Route('/me', name: 'api_me', methods: ['GET'])]
     public function me(): JsonResponse
     {
         $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        if (!$user instanceof User) return $this->respondNotAuthenticated();
 
-        return $this->json([
+        return $this->respond([
             'id' => $user->getId(),
             'email' => $user->getEmail(),
             'firstName' => $user->getFirstName(),
@@ -84,33 +106,25 @@ class AuthController extends AbstractController
         ]);
     }
 
+    // ===== UPDATE PROFILE =====
     #[Route('/profile', name: 'api_update_profile', methods: ['PUT'])]
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        if (!$user instanceof User) return $this->respondNotAuthenticated();
 
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['firstName'])) {
-            $user->setFirstName($data['firstName']);
-        }
-        if (isset($data['lastName'])) {
-            $user->setLastName($data['lastName']);
-        }
-        if (isset($data['phone'])) {
-            $user->setPhone($data['phone']);
-        }
-        if (isset($data['avatar'])) {
-            $user->setAvatar($data['avatar']);
+        foreach (['firstName', 'lastName', 'phone', 'avatar'] as $field) {
+            if (isset($data[$field])) {
+                $setter = 'set' . ucfirst($field);
+                $user->$setter($data[$field]);
+            }
         }
 
         $this->entityManager->flush();
 
-        return $this->json([
+        return $this->respond([
             'message' => 'Profile updated successfully',
             'user' => [
                 'id' => $user->getId(),
@@ -123,31 +137,25 @@ class AuthController extends AbstractController
         ]);
     }
 
+    // ===== CHANGE PASSWORD =====
     #[Route('/change-password', name: 'api_change_password', methods: ['POST'])]
     public function changePassword(Request $request): JsonResponse
     {
         $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        if (!$user instanceof User) return $this->respondNotAuthenticated();
 
         $data = json_decode($request->getContent(), true);
-
-        if (!isset($data['currentPassword']) || !isset($data['newPassword'])) {
-            return $this->json(['error' => 'Current and new password required'], Response::HTTP_BAD_REQUEST);
+        if (!isset($data['currentPassword'], $data['newPassword'])) {
+            return $this->respondBadRequest('Current and new password required');
         }
 
         if (!$this->passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
-            return $this->json(['error' => 'Current password is incorrect'], Response::HTTP_BAD_REQUEST);
+            return $this->respondBadRequest('Current password is incorrect');
         }
 
-        $user->setPassword(
-            $this->passwordHasher->hashPassword($user, $data['newPassword'])
-        );
-
+        $user->setPassword($this->passwordHasher->hashPassword($user, $data['newPassword']));
         $this->entityManager->flush();
 
-        return $this->json(['message' => 'Password changed successfully']);
+        return $this->respond(['message' => 'Password changed successfully']);
     }
 }

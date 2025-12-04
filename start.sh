@@ -1,92 +1,137 @@
 #!/bin/bash
 
-# Script de Inicio Automático - Plataforma Escolar
-# Bash Script para Mac/Linux
+# Script de inicio para la Plataforma Escolar
+# Levanta todos los servicios con Docker Compose
 
 set -e
 
 echo "🚀 Iniciando Plataforma Escolar..."
-echo ""
+echo "=================================="
+
+# Colores para output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 # Verificar que Docker esté corriendo
-echo "📋 Verificando Docker..."
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker no está corriendo. Por favor inicia Docker Desktop."
+    echo -e "${RED}❌ Error: Docker no está corriendo${NC}"
+    echo "Por favor inicia Docker Desktop y vuelve a intentar"
     exit 1
 fi
-echo "✅ Docker está corriendo"
+
+echo -e "${GREEN}✓ Docker está corriendo${NC}"
+
+# Detener contenedores existentes
 echo ""
+echo -e "${YELLOW}🛑 Deteniendo contenedores existentes...${NC}"
+docker-compose down 2>/dev/null || true
 
-# Levantar servicios
-echo "🐳 Levantando servicios con Docker Compose..."
-docker-compose up -d
-
-echo "✅ Servicios levantados"
-echo ""
-
-# Esperar a que los servicios estén listos
-echo "⏳ Esperando a que los servicios estén listos (30 segundos)..."
-sleep 30
-
-# Verificar estado de servicios
-echo "📊 Estado de servicios:"
-docker-compose ps
-echo ""
-
-# Ejecutar migraciones
-echo "🗄️  Configurando base de datos..."
-docker-compose exec -T backend php bin/console doctrine:database:create --if-not-exists 2>/dev/null || true
-docker-compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
-
-echo "✅ Base de datos configurada"
-echo ""
-
-# Cargar datos de prueba
-echo "👥 Cargando datos de prueba..."
-docker-compose exec -T backend php bin/console app:fixtures:load --no-interaction
-
-echo "✅ Datos de prueba cargados"
-echo ""
-
-# Mostrar información
-echo "================================================================================"
-echo "🎉 ¡Plataforma lista!"
-echo "================================================================================"
-echo ""
-
-echo "🌐 URLs de Acceso:"
-echo "   Frontend:    http://localhost:5173"
-echo "   Backend API: http://localhost:8000/api"
-echo "   API Docs:    http://localhost:8000/api/docs"
-echo "   GraphQL:     http://localhost:8000/api/graphql"
-echo "   AI Service:  http://localhost:8001/docs"
-echo ""
-
-echo "🔐 Credenciales de Prueba:"
-echo "   Admin:       admin@school.com / Admin123!"
-echo "   Coordinador: coordinador@school.com / Coord123!"
-echo "   Maestro:     maestro@school.com / Teacher123!"
-echo "   Secretaria:  secretaria@school.com / Secret123!"
-echo "   Padre:       padre@school.com / Parent123!"
-echo ""
-
-echo "📚 Comandos Útiles:"
-echo "   Ver logs:    docker-compose logs -f"
-echo "   Detener:     docker-compose down"
-echo "   Reiniciar:   docker-compose restart"
-echo ""
-
-echo "Abriendo frontend en el navegador..."
-sleep 2
-
-# Detectar sistema operativo y abrir navegador
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    open http://localhost:5173
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    xdg-open http://localhost:5173 2>/dev/null || sensible-browser http://localhost:5173 2>/dev/null || echo "Por favor abre http://localhost:5173 en tu navegador"
+# Limpiar volúmenes si se solicita
+if [ "$1" == "--clean" ]; then
+    echo -e "${YELLOW}🧹 Limpiando volúmenes...${NC}"
+    docker-compose down -v
 fi
 
+# Construir imágenes
 echo ""
-echo "✨ ¡Disfruta la plataforma!"
+echo -e "${YELLOW}🔨 Construyendo imágenes Docker...${NC}"
+docker-compose build --no-cache
+
+# Levantar servicios
+echo ""
+echo -e "${YELLOW}🚀 Levantando servicios...${NC}"
+docker-compose up -d
+
+# Esperar a que los servicios estén listos
+echo ""
+echo -e "${YELLOW}⏳ Esperando a que los servicios estén listos...${NC}"
+sleep 5
+
+# Verificar estado de servicios
+echo ""
+echo -e "${GREEN}📊 Estado de servicios:${NC}"
+docker-compose ps
+
+# Verificar salud de servicios
+echo ""
+echo -e "${YELLOW}🏥 Verificando salud de servicios...${NC}"
+
+# PostgreSQL
+if docker-compose exec -T database pg_isready -U app > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ PostgreSQL: Listo${NC}"
+else
+    echo -e "${RED}✗ PostgreSQL: No disponible${NC}"
+fi
+
+# Redis
+if docker-compose exec -T redis redis-cli -a redis_password ping > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Redis: Listo${NC}"
+else
+    echo -e "${RED}✗ Redis: No disponible${NC}"
+fi
+
+# Backend (esperar un poco más)
+sleep 3
+if curl -s http://localhost:8000/api > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Backend (Symfony): Listo${NC}"
+else
+    echo -e "${YELLOW}⚠ Backend (Symfony): Iniciando...${NC}"
+fi
+
+# Frontend
+if curl -s http://localhost:5173 > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Frontend (React): Listo${NC}"
+else
+    echo -e "${YELLOW}⚠ Frontend (React): Iniciando...${NC}"
+fi
+
+# AI Service
+if curl -s http://localhost:8001/health > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ AI Service (Python): Listo${NC}"
+else
+    echo -e "${YELLOW}⚠ AI Service (Python): Iniciando...${NC}"
+fi
+
+# Ejecutar migraciones
+echo ""
+echo -e "${YELLOW}🔄 Ejecutando migraciones de base de datos...${NC}"
+docker-compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction || true
+
+# Cargar fixtures (solo en desarrollo)
+if [ "$1" == "--fixtures" ]; then
+    echo -e "${YELLOW}📦 Cargando datos de prueba...${NC}"
+    docker-compose exec -T backend php bin/console doctrine:fixtures:load --no-interaction
+fi
+
+# Mostrar URLs
+echo ""
+echo -e "${GREEN}=================================="
+echo "✅ Plataforma Escolar iniciada correctamente"
+echo "==================================${NC}"
+echo ""
+echo "📍 URLs de acceso:"
+echo "   Frontend:    http://localhost:5173"
+echo "   Backend API: http://localhost:8000/api"
+echo "   AI Service:  http://localhost:8001"
+echo "   AI Docs:     http://localhost:8001/docs"
+echo ""
+echo "🗄️  Base de datos:"
+echo "   Host:     localhost"
+echo "   Puerto:   5432"
+echo "   Usuario:  app"
+echo "   Password: !ChangeMe!"
+echo "   Database: app"
+echo ""
+echo "📝 Comandos útiles:"
+echo "   Ver logs:           docker-compose logs -f"
+echo "   Ver logs backend:   docker-compose logs -f backend"
+echo "   Ver logs AI:        docker-compose logs -f ai-service"
+echo "   Detener:            docker-compose down"
+echo "   Reiniciar:          ./start.sh"
+echo "   Limpiar todo:       ./start.sh --clean"
+echo "   Con fixtures:       ./start.sh --fixtures"
+echo ""
+echo -e "${YELLOW}💡 Tip: Espera 30-60 segundos para que todos los servicios terminen de iniciar${NC}"
+echo ""

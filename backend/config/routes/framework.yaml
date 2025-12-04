@@ -1,3 +1,4 @@
+# config/routes/dev_errors.yaml
 when@dev:
     _errors:
         resource: '@FrameworkBundle/Resources/config/routing/errors.xml'

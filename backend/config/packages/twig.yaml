@@ -1,6 +1,17 @@
 twig:
     file_name_pattern: '*.twig'
+    # Evita renderizar archivos ajenos a Twig y mejora rendimiento
+    autoescape: 'name'
+    # Cache activado por defecto en prod (Symfony lo maneja solo)
+    debug: '%kernel.debug%'
+    strict_variables: false
+
+when@dev:
+    twig:
+        debug: true
+        strict_variables: false
 
 when@test:
     twig:
         strict_variables: true
+        debug: false

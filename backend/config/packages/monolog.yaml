@@ -15,72 +15,74 @@ when@dev:
 when@prod:
     monolog:
         handlers:
-            # Main application log
+
+            # Main application log (only errors)
             main:
                 type: fingers_crossed
                 action_level: error
-                handler: nested
+                handler: main_nested
                 excluded_http_codes: [404, 405]
-                buffer_size: 50
-            nested:
+
+            main_nested:
                 type: stream
-                path: php://stderr
+                path: "php://stderr"
                 level: debug
                 formatter: monolog.formatter.json
-            
-            # Security events (for SIEM)
+
+            # Security logs
             security:
                 type: stream
                 path: "%kernel.logs_dir%/security.log"
                 level: info
                 channels: ["security"]
                 formatter: monolog.formatter.json
-            
-            # Audit logs (for compliance)
+
+            # Audit logs (BD, usuarios, acciones críticas)
             audit:
-                type: stream
+                type: rotating_file
                 path: "%kernel.logs_dir%/audit.log"
                 level: info
                 channels: ["audit"]
+                max_files: 30
                 formatter: monolog.formatter.json
-            
-            # Performance monitoring
+
+            # Performance logs (API, workers)
             performance:
-                type: stream
+                type: rotating_file
                 path: "%kernel.logs_dir%/performance.log"
                 level: info
                 channels: ["performance"]
+                max_files: 14
                 formatter: monolog.formatter.json
-            
-            # Error tracking (Sentry/similar)
-            sentry:
-                type: service
-                id: monolog.handler.sentry
-                level: error
-            
-            # Console errors
+
+            # Deprecations
+            deprecation:
+                type: rotating_file
+                channels: [deprecation]
+                path: "%kernel.logs_dir%/deprecation.log"
+                max_files: 5
+
+            # Console
             console:
                 type: console
                 process_psr_3_messages: false
                 channels: ["!event", "!doctrine"]
-            
-            # Deprecation warnings
-            deprecation:
-                type: stream
-                channels: [deprecation]
-                path: "%kernel.logs_dir%/deprecation.log"
+
+            # Sentry handler
+            sentry:
+                type: service
+                id: monolog.handler.sentry
+                level: error
 
     services:
-        # JSON formatter for structured logging
         monolog.formatter.json:
             class: Monolog\Formatter\JsonFormatter
             arguments:
-                - 0 # batch mode
-                - true # append newline
-                - true # ignore empty context
-                - true # include stack traces
+                - 0       # batch mode
+                - true    # append newline
+                - true    # ignore empty context
+                - true    # include stack traces
 
-        # Sentry handler (requires sentry/sentry-symfony)
         monolog.handler.sentry:
             class: Sentry\Monolog\Handler
             arguments:

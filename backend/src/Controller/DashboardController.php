@@ -6,8 +6,6 @@ use App\Repository\EnrollmentRepository;
 use App\Repository\PaymentRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/dashboard')]
@@ -16,36 +14,35 @@ class DashboardController extends AbstractController
     public function __construct(
         private EnrollmentRepository $enrollmentRepository,
         private PaymentRepository $paymentRepository
-    ) {
+    ) {}
+
+    // ===== Helpers =====
+    private function respond(mixed $data, int $status = 200): JsonResponse
+    {
+        return $this->json($data, $status);
     }
 
+    // ===== Endpoints =====
     #[Route('/stats', name: 'api_dashboard_stats', methods: ['GET'])]
     public function stats(): JsonResponse
     {
         $currentYear = (int) date('Y');
-        
-        // Get enrollment stats
-        $enrollmentStats = $this->enrollmentRepository->getStatsByGrade($currentYear);
-        
-        // Get active enrollments count
-        $activeEnrollments = count($this->enrollmentRepository->findActiveByYear($currentYear));
-        
-        // Get payment stats
-        $pendingPayments = count($this->paymentRepository->findPending());
-        $overduePayments = count($this->paymentRepository->findOverdue());
-        
-        // Get daily collection
-        $today = new \DateTime();
-        $dailyTotal = $this->paymentRepository->getDailyTotal($today);
 
-        return $this->json([
+        $enrollmentStats = $this->enrollmentRepository->getStatsByGrade($currentYear);
+        $activeEnrollmentsCount = $this->enrollmentRepository->countActiveByYear($currentYear);
+
+        $pendingPaymentsCount = $this->paymentRepository->countPending();
+        $overduePaymentsCount = $this->paymentRepository->countOverdue();
+        $dailyTotal = $this->paymentRepository->getDailyTotal(new \DateTime());
+
+        return $this->respond([
             'enrollments' => [
-                'total' => $activeEnrollments,
+                'total' => $activeEnrollmentsCount,
                 'byGrade' => $enrollmentStats,
             ],
             'payments' => [
-                'pending' => $pendingPayments,
-                'overdue' => $overduePayments,
+                'pending' => $pendingPaymentsCount,
+                'overdue' => $overduePaymentsCount,
                 'dailyTotal' => $dailyTotal,
             ],
             'academicYear' => $currentYear,
@@ -56,23 +53,18 @@ class DashboardController extends AbstractController
     public function debtors(): JsonResponse
     {
         $debtors = $this->paymentRepository->getDebtorsReport();
-        
-        return $this->json($debtors);
+        return $this->respond($debtors);
     }
 
     #[Route('/recent-enrollments', name: 'api_dashboard_recent_enrollments', methods: ['GET'])]
-    public function recentEnrollments(Request $request): JsonResponse
+    public function recentEnrollments(int $limit = 10): JsonResponse
     {
-        $limit = $request->query->getInt('limit', 10);
         $currentYear = (int) date('Y');
-        
-        $enrollments = $this->enrollmentRepository->findActiveByYear($currentYear);
-        
-        // Sort by created date and limit
-        usort($enrollments, fn($a, $b) => $b->getCreatedAt() <=> $a->getCreatedAt());
-        $recentEnrollments = array_slice($enrollments, 0, $limit);
-        
-        return $this->json($recentEnrollments, Response::HTTP_OK, [], [
+
+        // Obtener directamente los últimos registros en la consulta
+        $recentEnrollments = $this->enrollmentRepository->findRecentActiveByYear($currentYear, $limit);
+
+        return $this->respond($recentEnrollments, 200, [], [
             'groups' => ['enrollment:read']
         ]);
     }

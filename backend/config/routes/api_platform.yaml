@@ -1,4 +1,8 @@
+# config/routes/api_platform.yaml
 api_platform:
     resource: .
     type: api_platform
     prefix: /api
+    # Opcional: habilitar CORS específico para la API
+    options:
+        cors_allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']

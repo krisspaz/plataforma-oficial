@@ -1,26 +1,29 @@
-# config/packages/rate_limiter.yaml
 framework:
     rate_limiter:
-        # Login attempts limiter
+        # Intentos de login (ataques de fuerza bruta)
         login:
-            policy: 'sliding_window'
+            policy: sliding_window
             limit: 5
             interval: '15 minutes'
-            
-        # API requests limiter
+            cache_pool: rate_limiter.cache
+
+        # Límite global para API (protege contra spam / bots)
         api:
-            policy: 'fixed_window'
+            policy: fixed_window
             limit: 100
             interval: '1 minute'
-            
-        # Password reset limiter
+            cache_pool: rate_limiter.cache
+
+        # Recuperación de contraseña (evita abuso)
         password_reset:
-            policy: 'sliding_window'
+            policy: sliding_window
             limit: 3
             interval: '1 hour'
-            
-        # Registration limiter
+            cache_pool: rate_limiter.cache
+
+        # Registros de usuario (evita bots creando cuentas)
         registration:
-            policy: 'sliding_window'
+            policy: sliding_window
             limit: 3
             interval: '1 hour'
+            cache_pool: rate_limiter.cache

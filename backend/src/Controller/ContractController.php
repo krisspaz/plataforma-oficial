@@ -25,33 +25,52 @@ class ContractController extends AbstractController
         private ContractService $contractService,
         private NotificationService $notificationService,
         private EntityManagerInterface $entityManager
-    ) {
+    ) {}
+
+    // ===== Helpers =====
+    private function respond(mixed $data, int $status = 200): JsonResponse
+    {
+        return $this->json($data, $status);
     }
 
+    private function respondNotFound(string $message = 'Not found'): JsonResponse
+    {
+        return $this->respond(['error' => $message], Response::HTTP_NOT_FOUND);
+    }
+
+    private function respondBadRequest(string $message): JsonResponse
+    {
+        return $this->respond(['error' => $message], Response::HTTP_BAD_REQUEST);
+    }
+
+    private function notifyParentContract(Contract $contract, string $message): void
+    {
+        $this->notificationService->createNotification(
+            $contract->getParent()->getUser(),
+            'Contrato',
+            $message,
+            'contract',
+            ['contractId' => $contract->getId(), 'contractNumber' => $contract->getContractNumber()]
+        );
+    }
+
+    // ===== Endpoints =====
     #[Route('', name: 'api_contracts_index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
         $status = $request->query->get('status');
-        
-        if ($status) {
-            $contracts = $this->contractRepository->findByStatus($status);
-        } else {
-            $contracts = $this->contractRepository->findAll();
-        }
-        
-        return $this->json($contracts, Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        $contracts = $status
+            ? $this->contractRepository->findByStatus($status)
+            : $this->contractRepository->findAll();
+
+        return $this->respond($contracts);
     }
 
     #[Route('/pending', name: 'api_contracts_pending', methods: ['GET'])]
     public function pending(): JsonResponse
     {
         $contracts = $this->contractRepository->findPending();
-        
-        return $this->json($contracts, Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        return $this->respond($contracts);
     }
 
     #[Route('', name: 'api_contracts_create', methods: ['POST'])]
@@ -59,21 +78,15 @@ class ContractController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
 
-        if (!isset($data['enrollmentId']) || !isset($data['parentId']) || !isset($data['totalAmount'])) {
-            return $this->json([
-                'error' => 'Enrollment ID, Parent ID, and total amount are required'
-            ], Response::HTTP_BAD_REQUEST);
+        if (empty($data['enrollmentId'] ?? null) || empty($data['parentId'] ?? null) || empty($data['totalAmount'] ?? null)) {
+            return $this->respondBadRequest('Enrollment ID, Parent ID, and total amount are required');
         }
 
         $enrollment = $this->enrollmentRepository->find($data['enrollmentId']);
-        if (!$enrollment) {
-            return $this->json(['error' => 'Enrollment not found'], Response::HTTP_NOT_FOUND);
-        }
+        if (!$enrollment) return $this->respondNotFound('Enrollment not found');
 
         $parent = $this->parentRepository->find($data['parentId']);
-        if (!$parent) {
-            return $this->json(['error' => 'Parent not found'], Response::HTTP_NOT_FOUND);
-        }
+        if (!$parent) return $this->respondNotFound('Parent not found');
 
         $contract = $this->contractService->generateContract(
             $enrollment,
@@ -82,69 +95,43 @@ class ContractController extends AbstractController
             $data['installments'] ?? null
         );
 
-        // Send notification
-        $this->notificationService->createNotification(
-            $parent->getUser(),
-            'Nuevo Contrato Generado',
-            "Se ha generado el contrato {$contract->getContractNumber()}. Por favor revíselo y fírmelo.",
-            'contract',
-            ['contractId' => $contract->getId(), 'contractNumber' => $contract->getContractNumber()]
-        );
+        $this->notifyParentContract($contract, "Se ha generado el contrato {$contract->getContractNumber()}. Por favor revíselo y fírmelo.");
 
-        return $this->json([
+        return $this->respond([
             'message' => 'Contract created successfully',
             'contract' => $contract
-        ], Response::HTTP_CREATED, [], [
-            'groups' => ['contract:read']
-        ]);
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'api_contracts_show', methods: ['GET'])]
     public function show(int $id): JsonResponse
     {
         $contract = $this->contractRepository->find($id);
-        
-        if (!$contract) {
-            return $this->json(['error' => 'Contract not found'], Response::HTTP_NOT_FOUND);
-        }
+        if (!$contract) return $this->respondNotFound('Contract not found');
 
-        return $this->json($contract, Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        return $this->respond($contract);
     }
 
     #[Route('/{id}/sign', name: 'api_contracts_sign', methods: ['POST'])]
     public function sign(int $id, Request $request): JsonResponse
     {
         $contract = $this->contractRepository->find($id);
-        
-        if (!$contract) {
-            return $this->json(['error' => 'Contract not found'], Response::HTTP_NOT_FOUND);
-        }
+        if (!$contract) return $this->respondNotFound('Contract not found');
 
-        if ($contract->isSigned()) {
-            return $this->json(['error' => 'Contract is already signed'], Response::HTTP_BAD_REQUEST);
-        }
+        if ($contract->isSigned()) return $this->respondBadRequest('Contract is already signed');
 
         $data = json_decode($request->getContent(), true);
-
-        if (!isset($data['signature'])) {
-            return $this->json(['error' => 'Signature data required'], Response::HTTP_BAD_REQUEST);
-        }
+        if (empty($data['signature'] ?? null)) return $this->respondBadRequest('Signature data required');
 
         $signedContract = $this->contractService->signContract($contract, $data['signature']);
-
-        // Send notification
         $this->notificationService->notifyContractSigned(
             $signedContract->getParent()->getUser(),
             $signedContract->getContractNumber()
         );
 
-        return $this->json([
+        return $this->respond([
             'message' => 'Contract signed successfully',
             'contract' => $signedContract
-        ], Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
         ]);
     }
 
@@ -152,19 +139,13 @@ class ContractController extends AbstractController
     public function byEnrollment(int $enrollmentId): JsonResponse
     {
         $contracts = $this->contractRepository->findByEnrollment($enrollmentId);
-        
-        return $this->json($contracts, Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        return $this->respond($contracts);
     }
 
     #[Route('/student/{studentId}', name: 'api_contracts_by_student', methods: ['GET'])]
     public function byStudent(int $studentId): JsonResponse
     {
         $contracts = $this->contractRepository->findByStudent($studentId);
-        
-        return $this->json($contracts, Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        return $this->respond($contracts);
     }
 }

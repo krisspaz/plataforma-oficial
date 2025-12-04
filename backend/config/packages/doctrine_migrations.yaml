@@ -1,6 +1,13 @@
 doctrine_migrations:
     migrations_paths:
-        # namespace is arbitrary but should be different from App\Migrations
-        # as migrations classes should NOT be autoloaded
+        # Namespace independiente para evitar autoload accidental
         'DoctrineMigrations': '%kernel.project_dir%/migrations'
+
+    # No permitir el profiler en production (buena práctica)
     enable_profiler: false
+
+    # Organización de carpetas por año (recomendado)
+    organizing_migrations: true
+
+    # Evita que se generen migraciones vacías por cambios irrelevantes de metadata
+    check_database_platform: true
