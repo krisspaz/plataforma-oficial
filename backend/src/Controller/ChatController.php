@@ -25,224 +25,154 @@ class ChatController extends AbstractController
         private UserRepository $userRepository,
         private NotificationService $notificationService,
         private EntityManagerInterface $entityManager
-    ) {
+    ) {}
+
+    // ===== Helpers =====
+    private function getAuthenticatedUser(): ?User
+    {
+        $user = $this->getUser();
+        return $user instanceof User ? $user : null;
     }
 
+    private function respond(mixed $data, int $status = 200): JsonResponse
+    {
+        return $this->json($data, $status);
+    }
+
+    private function respondNotAuthenticated(): JsonResponse
+    {
+        return $this->respond(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+    }
+
+    private function respondNotFound(string $message = 'Not found'): JsonResponse
+    {
+        return $this->respond(['error' => $message], Response::HTTP_NOT_FOUND);
+    }
+
+    private function notifyParticipants(ChatRoom $room, ChatMessage $message, User $sender): void
+    {
+        foreach ($room->getParticipants() ?? [] as $participantId) {
+            if ($participantId === $sender->getId()) continue;
+            $participant = $this->userRepository->find($participantId);
+            if ($participant) {
+                $preview = strlen($message->getContent()) > 50
+                    ? substr($message->getContent(), 0, 50) . '...'
+                    : $message->getContent();
+
+                $this->notificationService->notifyNewMessage(
+                    $participant,
+                    $sender->getFullName(),
+                    $preview
+                );
+            }
+        }
+    }
+
+    // ===== Rooms =====
     #[Route('/rooms', name: 'api_chat_rooms', methods: ['GET'])]
     public function rooms(): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $rooms = $this->chatRoomRepository->findByParticipant($user->getId());
-        
-        return $this->json($rooms, Response::HTTP_OK, [], [
-            'groups' => ['chatroom:read']
-        ]);
+        return $this->respond($rooms, Response::HTTP_OK);
     }
 
     #[Route('/rooms', name: 'api_chat_create_room', methods: ['POST'])]
     public function createRoom(Request $request): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $data = json_decode($request->getContent(), true);
+        if (!isset($data['participantId'])) return $this->respond(['error' => 'Participant ID required'], Response::HTTP_BAD_REQUEST);
 
-        if (!isset($data['participantId'])) {
-            return $this->json(['error' => 'Participant ID required'], Response::HTTP_BAD_REQUEST);
-        }
+        // Check for existing room
+        $existingRoom = $this->chatRoomRepository->findOneToOneRoom($user->getId(), $data['participantId']);
+        if ($existingRoom) return $this->respond($existingRoom, Response::HTTP_OK);
 
-        // Check if one-to-one room already exists
-        $existingRoom = $this->chatRoomRepository->findOneToOneRoom(
-            $user->getId(),
-            $data['participantId']
-        );
-
-        if ($existingRoom) {
-            return $this->json($existingRoom, Response::HTTP_OK, [], [
-                'groups' => ['chatroom:read']
-            ]);
-        }
-
-        // Create new room
         $room = new ChatRoom();
         $room->setType('one_to_one');
         $room->setParticipants([$user->getId(), $data['participantId']]);
-
-        if (isset($data['name'])) {
-            $room->setName($data['name']);
-        }
+        if (isset($data['name'])) $room->setName($data['name']);
 
         $this->entityManager->persist($room);
         $this->entityManager->flush();
 
-        return $this->json($room, Response::HTTP_CREATED, [], [
-            'groups' => ['chatroom:read']
-        ]);
+        return $this->respond($room, Response::HTTP_CREATED);
     }
 
+    // ===== Messages =====
     #[Route('/rooms/{id}/messages', name: 'api_chat_messages', methods: ['GET'])]
     public function messages(int $id, Request $request): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $room = $this->chatRoomRepository->find($id);
-        
-        if (!$room) {
-            return $this->json(['error' => 'Room not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$room->isParticipant($user->getId())) {
-            return $this->json(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
-        }
+        if (!$room) return $this->respondNotFound('Room not found');
+        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
 
         $limit = $request->query->getInt('limit', 50);
         $messages = $this->chatMessageRepository->findByRoom($id, $limit);
 
-        return $this->json($messages, Response::HTTP_OK, [], [
-            'groups' => ['chatmessage:read']
-        ]);
+        return $this->respond($messages, Response::HTTP_OK);
     }
 
     #[Route('/rooms/{id}/messages', name: 'api_chat_send_message', methods: ['POST'])]
     public function sendMessage(int $id, Request $request): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $room = $this->chatRoomRepository->find($id);
-        
-        if (!$room) {
-            return $this->json(['error' => 'Room not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$room->isParticipant($user->getId())) {
-            return $this->json(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
-        }
+        if (!$room) return $this->respondNotFound('Room not found');
+        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
 
         $data = json_decode($request->getContent(), true);
-
-        if (!isset($data['content'])) {
-            return $this->json(['error' => 'Content required'], Response::HTTP_BAD_REQUEST);
-        }
+        if (empty($data['content'])) return $this->respond(['error' => 'Content required'], Response::HTTP_BAD_REQUEST);
 
         $message = new ChatMessage();
         $message->setRoom($room);
         $message->setSender($user);
         $message->setContent($data['content']);
-
-        if (isset($data['attachments'])) {
-            $message->setAttachments($data['attachments']);
-        }
+        $message->setAttachments($data['attachments'] ?? null);
 
         $this->entityManager->persist($message);
         $this->entityManager->flush();
 
-        // Notify other participants
-        $participants = $room->getParticipants() ?? [];
-        foreach ($participants as $participantId) {
-            if ($participantId !== $user->getId()) {
-                $participant = $this->userRepository->find($participantId);
-                if ($participant) {
-                    $preview = strlen($data['content']) > 50 
-                        ? substr($data['content'], 0, 50) . '...' 
-                        : $data['content'];
-                    
-                    $this->notificationService->notifyNewMessage(
-                        $participant,
-                        $user->getFirstName() . ' ' . $user->getLastName(),
-                        $preview
-                    );
-                }
-            }
-        }
+        $this->notifyParticipants($room, $message, $user);
 
-        // TODO: Publish to Mercure Hub for real-time updates
-        // $this->publishToMercure($room, $message);
-
-        return $this->json($message, Response::HTTP_CREATED, [], [
-            'groups' => ['chatmessage:read']
-        ]);
+        return $this->respond($message, Response::HTTP_CREATED);
     }
 
     #[Route('/messages/{id}/read', name: 'api_chat_mark_read', methods: ['POST'])]
     public function markAsRead(int $id): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $message = $this->chatMessageRepository->find($id);
-        
-        if (!$message) {
-            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
-        }
+        if (!$message) return $this->respondNotFound('Message not found');
 
         $message->markAsReadBy($user->getId());
         $this->entityManager->flush();
 
-        return $this->json([
-            'message' => 'Message marked as read',
-            'chatMessage' => $message
-        ], Response::HTTP_OK, [], [
-            'groups' => ['chatmessage:read']
-        ]);
+        return $this->respond(['message' => 'Message marked as read', 'chatMessage' => $message], Response::HTTP_OK);
     }
 
     #[Route('/rooms/{id}/unread', name: 'api_chat_unread', methods: ['GET'])]
     public function unreadMessages(int $id): JsonResponse
     {
-        $user = $this->getUser();
-        
-        if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
+        $user = $this->getAuthenticatedUser();
+        if (!$user) return $this->respondNotAuthenticated();
 
         $room = $this->chatRoomRepository->find($id);
-        
-        if (!$room) {
-            return $this->json(['error' => 'Room not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$room->isParticipant($user->getId())) {
-            return $this->json(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
-        }
+        if (!$room) return $this->respondNotFound('Room not found');
+        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
 
         $unreadMessages = $this->chatMessageRepository->findUnreadInRoom($id, $user->getId());
-
-        return $this->json([
-            'messages' => $unreadMessages,
-            'count' => count($unreadMessages)
-        ], Response::HTTP_OK, [], [
-            'groups' => ['chatmessage:read']
-        ]);
-    }
-
-    private function publishToMercure(ChatRoom $room, ChatMessage $message): void
-    {
-        // TODO: Implement Mercure publishing
-        // This would publish the message to all subscribers of the room
-        // Example:
-        // $update = new Update(
-        //     '/chat/room/' . $room->getId(),
-        //     json_encode(['message' => $message])
-        // );
-        // $this->mercureHub->publish($update);
+        return $this->respond(['messages' => $unreadMessages, 'count' => count($unreadMessages)], Response::HTTP_OK);
     }
 }
