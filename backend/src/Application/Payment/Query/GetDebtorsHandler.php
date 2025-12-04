@@ -4,51 +4,49 @@ declare(strict_types=1);
 
 namespace App\Application\Payment\Query;
 
-use App\Domain\Payment\Service\DebtorReportGenerator;
+use App\Application\Payment\DTO\DebtorDTO;
+use App\Domain\Payment\Repository\InstallmentRepositoryInterface;
+use App\Infrastructure\Cache\CacheService;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
 final class GetDebtorsHandler
 {
     public function __construct(
-        private readonly DebtorReportGenerator $reportGenerator
+        private readonly InstallmentRepositoryInterface $installmentRepository,
+        private readonly CacheService $cache
     ) {}
 
     public function __invoke(GetDebtorsQuery $query): array
     {
-        $report = $this->reportGenerator->generate();
+        return $this->cache->getDebtorsReport(
+            $query->gradeId,
+            function () use ($query): array {
+                $overdue = $this->installmentRepository->findOverdue($query->gradeId, $query->minDebt);
 
-        // Apply filters
-        $debtors = $report['debtors'];
+                // Group by student
+                $byStudent = [];
+                foreach ($overdue as $installment) {
+                    $studentId = $installment->getPaymentPlan()->getEnrollment()->getStudent()->getId();
 
-        if ($query->gradeId !== null) {
-            $debtors = array_filter($debtors, function ($debtor) use ($query) {
-                // This would need grade_id in the debtor array
-                return true; // Simplified for now
-            });
-        }
+                    if (!isset($byStudent[$studentId])) {
+                        $byStudent[$studentId] = [
+                            'student' => $installment->getPaymentPlan()->getEnrollment()->getStudent(),
+                            'enrollment' => $installment->getPaymentPlan()->getEnrollment(),
+                            'installments' => [],
+                            'total_debt' => 0.0,
+                        ];
+                    }
 
-        if ($query->level !== null) {
-            $debtors = array_filter($debtors, fn($d) => $d['level'] === $query->level);
-        }
+                    $byStudent[$studentId]['installments'][] = $installment;
+                    $byStudent[$studentId]['total_debt'] += $installment->getPendingAmount();
+                }
 
-        if ($query->minDaysOverdue !== null) {
-            $debtors = array_filter($debtors, fn($d) => $d['days_overdue'] >= $query->minDaysOverdue);
-        }
-
-        // Recalculate summary with filtered data
-        $filteredDebtors = array_values($debtors);
-        $totalAmount = array_sum(array_column($filteredDebtors, 'total_overdue'));
-        $criticalCount = count(array_filter($filteredDebtors, fn($d) => $d['level'] === 'critical'));
-
-        return [
-            'summary' => [
-                'total_debtors' => count($filteredDebtors),
-                'total_amount' => $totalAmount,
-                'critical_count' => $criticalCount,
-            ],
-            'debtors' => $filteredDebtors,
-            'generated_at' => $report['generated_at'],
-        ];
+                return array_map(
+                    fn($data) => DebtorDTO::create($data),
+                    array_values($byStudent)
+                );
+            }
+        );
     }
 }

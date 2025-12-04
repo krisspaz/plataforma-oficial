@@ -6,26 +6,26 @@ namespace App\Application\Coordination\Query;
 
 use App\Application\Coordination\DTO\CalendarEventDTO;
 use App\Domain\Coordination\Repository\CalendarEventRepositoryInterface;
-use DateTimeImmutable;
+use App\Infrastructure\Cache\CacheService;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
 final class GetCalendarEventsHandler
 {
     public function __construct(
-        private readonly CalendarEventRepositoryInterface $eventRepository
+        private readonly CalendarEventRepositoryInterface $repository,
+        private readonly CacheService $cache
     ) {}
 
     public function __invoke(GetCalendarEventsQuery $query): array
     {
-        $start = new DateTimeImmutable($query->startDate);
-        $end = new DateTimeImmutable($query->endDate);
-
-        $events = $this->eventRepository->findBetween($start, $end);
-
-        return array_map(
-            fn($event) => CalendarEventDTO::fromEntity($event),
-            $events
+        return $this->cache->getCalendarEvents(
+            $query->startDate->format('Y-m-d'),
+            $query->endDate->format('Y-m-d'),
+            fn() => array_map(
+                fn($event) => CalendarEventDTO::fromEntity($event),
+                $this->repository->findByDateRange($query->startDate, $query->endDate)
+            )
         );
     }
 }

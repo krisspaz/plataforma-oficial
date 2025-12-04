@@ -1,0 +1,42 @@
+# config/services/grades.yaml
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Repositories
+    App\Domain\Grades\Repository\GradeRecordRepositoryInterface:
+        class: App\Infrastructure\Grades\Repository\DoctrineGradeRecordRepository
+        public: true
+
+    App\Domain\Grades\Repository\BimesterClosureRepositoryInterface:
+        class: App\Infrastructure\Grades\Repository\DoctrineBimesterClosureRepository
+        public: true
+
+    App\Infrastructure\Grades\Repository\DoctrineGradeRecordRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    App\Infrastructure\Grades\Repository\DoctrineBimesterClosureRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    # Command Handlers
+    App\Application\Grades\Command\RecordGradeHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Grades\Command\CloseBimesterHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Query Handlers
+    App\Application\Grades\Query\GetStudentGradesHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Controller
+    App\Controller\Api\GradesController:
+        public: true
+        tags: ['controller.service_arguments']

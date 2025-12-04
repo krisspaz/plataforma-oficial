@@ -1,23 +1,57 @@
+# Cache Configuration
+
 framework:
     cache:
-        # Redis principal
-        default_redis_provider: 'redis://redis:6379'
-
-        # Cache de la aplicación (serializers, config, etc.)
+        # Redis adapter for production
         app: cache.adapter.redis
-
-        # Cache del sistema (validación, serializer, anotaciones)
-        system: cache.adapter.redis
-
+        default_redis_provider: '%env(REDIS_URL)%'
+        
         pools:
-            # Pool para rate limiting
-            rate_limiter.cache:
+            # Short-lived cache (5 minutes)
+            cache.short:
                 adapter: cache.adapter.redis
+                default_lifetime: 300
                 
-            # Cache de resultados de Doctrine (consultas)
-            doctrine.result_cache_pool:
+            # Standard cache (1 hour)
+            cache.standard:
                 adapter: cache.adapter.redis
+                default_lifetime: 3600
+                
+            # Long-lived cache (24 hours)
+            cache.long:
+                adapter: cache.adapter.redis
+                default_lifetime: 86400
+                
+            # Grades cache
+            cache.grades:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+                tags: true
+                
+            # Announcements cache
+            cache.announcements:
+                adapter: cache.adapter.redis
+                default_lifetime: 300
+                tags: true
+                
+            # Calendar cache
+            cache.calendar:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+                tags: true
+                
+            # Payments cache
+            cache.payments:
+                adapter: cache.adapter.redis
+                default_lifetime: 300
+                tags: true
 
-            # Cache del sistema de Doctrine (metadata + query cache)
-            doctrine.system_cache_pool:
-                adapter: cache.adapter.redis
+when@dev:
+    framework:
+        cache:
+            app: cache.adapter.filesystem
+
+when@test:
+    framework:
+        cache:
+            app: cache.adapter.array

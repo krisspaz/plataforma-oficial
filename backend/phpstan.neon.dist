@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // PHPStan Level
+    'level' => 6,
+    
+    'paths' => [
+        'src',
+    ],
+    
+    'excludePaths' => [
+        'src/DataFixtures',
+        'src/Kernel.php',
+    ],
+    
+    'checkMissingIterableValueType' => false,
+    
+    'ignoreErrors' => [
+        '#Call to an undefined method Doctrine\\ORM\\EntityRepository#',
+    ],
+    
+    'symfony' => [
+        'consoleApplicationLoader' => 'tests/console-application.php',
+    ],
+];

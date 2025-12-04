@@ -1,0 +1,9 @@
+# Sentry Configuration for Error Tracking
+
+# Backend (Symfony)
+# Add to .env
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+
+# Frontend (React)  
+# Add to .env
+VITE_SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id

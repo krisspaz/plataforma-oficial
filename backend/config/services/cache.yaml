@@ -1,0 +1,17 @@
+# Cache Service Configuration
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Cache pools (injected from cache.yaml)
+    App\Infrastructure\Cache\CacheService:
+        arguments:
+            $gradesCache: '@cache.grades'
+            $announcementsCache: '@cache.announcements'
+            $calendarCache: '@cache.calendar'
+            $paymentsCache: '@cache.payments'
+            $cache: '@cache.app'
+            $logger: '@logger'
+        public: true
