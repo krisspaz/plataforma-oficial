@@ -1,0 +1,62 @@
+# config/services/coordination.yaml
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Repositories
+    App\Domain\Coordination\Repository\AssignmentRepositoryInterface:
+        class: App\Infrastructure\Coordination\Repository\DoctrineAssignmentRepository
+        public: true
+
+    App\Domain\Coordination\Repository\AnnouncementRepositoryInterface:
+        class: App\Infrastructure\Coordination\Repository\DoctrineAnnouncementRepository
+        public: true
+
+    App\Domain\Coordination\Repository\CalendarEventRepositoryInterface:
+        class: App\Infrastructure\Coordination\Repository\DoctrineCalendarEventRepository
+        public: true
+
+    App\Infrastructure\Coordination\Repository\DoctrineAssignmentRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    App\Infrastructure\Coordination\Repository\DoctrineAnnouncementRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    App\Infrastructure\Coordination\Repository\DoctrineCalendarEventRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    # Command Handlers
+    App\Application\Coordination\Command\AssignTeacherHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Coordination\Command\CreateAnnouncementHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Coordination\Command\CreateCalendarEventHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Query Handlers
+    App\Application\Coordination\Query\GetTeacherAssignmentsHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Coordination\Query\GetAnnouncementsHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Coordination\Query\GetCalendarEventsHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Controller
+    App\Controller\Api\CoordinationController:
+        public: true
+        tags: ['controller.service_arguments']

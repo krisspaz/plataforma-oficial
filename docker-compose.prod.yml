@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: app_php_prod
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=15&charset=utf8
+    volumes:
+      - ./backend:/srv/app:ro
+    depends_on:
+      - database
+      - redis
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+
+  ai-service:
+    build: ./ai-service
+    environment:
+      PORT: 8000
+    restart: always
+
+  database:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+volumes:
+  db-data:

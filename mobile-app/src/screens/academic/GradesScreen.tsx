@@ -1,0 +1,26 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+export default function GradesScreen() {
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.title}>Mis Notas</Text>
+            <Text>Próximamente...</Text>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+        padding: 24,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#0f172a',
+        marginBottom: 24,
+    },
+});

@@ -1,0 +1,56 @@
+# config/services.yaml - Payment Services Configuration
+
+services:
+    # Default configuration
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Domain Services
+    App\Domain\Payment\Service\PaymentPlanCalculator:
+        public: true
+
+    App\Domain\Payment\Service\DebtorReportGenerator:
+        public: true
+        arguments:
+            $installmentRepository: '@App\Infrastructure\Payment\Repository\DoctrineInstallmentRepository'
+
+    # Repositories
+    App\Domain\Payment\Repository\PaymentPlanRepositoryInterface:
+        class: App\Infrastructure\Payment\Repository\DoctrinePaymentPlanRepository
+        public: true
+
+    App\Domain\Payment\Repository\InstallmentRepositoryInterface:
+        class: App\Infrastructure\Payment\Repository\DoctrineInstallmentRepository
+        public: true
+
+    App\Infrastructure\Payment\Repository\DoctrinePaymentPlanRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    App\Infrastructure\Payment\Repository\DoctrineInstallmentRepository:
+        public: true
+        tags: ['doctrine.repository_service']
+
+    # Command Handlers
+    App\Application\Payment\Command\CreatePaymentPlanHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Payment\Command\RecordInstallmentPaymentHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Query Handlers
+    App\Application\Payment\Query\GetDebtorsHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    App\Application\Payment\Query\GetDailyClosureHandler:
+        public: true
+        tags: ['messenger.message_handler']
+
+    # Controllers
+    App\Controller\Api\PaymentController:
+        public: true
+        tags: ['controller.service_arguments']
