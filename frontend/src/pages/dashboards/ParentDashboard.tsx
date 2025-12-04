@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { errorHandler } from "@/lib/errorHandler";
 
 interface ParentStats {
     childrenCount: number;
@@ -14,11 +15,41 @@ interface ParentStats {
     activeContracts: number;
 }
 
+interface ChildUser {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+}
+
+interface ChildData {
+    id: number;
+    user: ChildUser;
+}
+
 interface Child {
     id: number;
     firstName: string;
     lastName: string;
     grade: string;
+}
+
+interface ChildrenResponse {
+    children: ChildData[];
+    count: number;
+}
+
+interface PaymentSummary {
+    count: number;
+    total_pending: number;
+}
+
+interface PaymentsResponse {
+    summary: PaymentSummary;
+}
+
+interface ContractsResponse {
+    count: number;
 }
 
 export const ParentDashboard = () => {
@@ -31,15 +62,15 @@ export const ParentDashboard = () => {
         const fetchData = async () => {
             try {
                 // Fetch children
-                const childrenData = await api.get<{ children: any[], count: number }>('/parents/my-children');
+                const childrenData = await api.get<ChildrenResponse>('/parents/my-children');
 
                 // Fetch payments summary
-                const paymentsData = await api.get<{ summary: any }>('/parents/my-payments');
+                const paymentsData = await api.get<PaymentsResponse>('/parents/my-payments');
 
                 // Fetch contracts
-                const contractsData = await api.get<{ count: number }>('/parents/my-contracts');
+                const contractsData = await api.get<ContractsResponse>('/parents/my-contracts');
 
-                setChildren(childrenData.children.map((child: any) => ({
+                setChildren(childrenData.children.map((child: ChildData) => ({
                     id: child.id,
                     firstName: child.user.firstName,
                     lastName: child.user.lastName,
@@ -53,7 +84,7 @@ export const ParentDashboard = () => {
                     activeContracts: contractsData.count
                 });
             } catch (error) {
-                console.error('Failed to fetch parent data', error);
+                errorHandler.handleApiError(error, 'No se pudieron cargar los datos');
             } finally {
                 setLoading(false);
             }

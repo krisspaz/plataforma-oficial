@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { Loader2 } from 'lucide-react';
 import { AIDashboard } from "@/components/AIDashboard";
+import { errorHandler } from "@/lib/errorHandler";
 
 interface DashboardStats {
     enrollments: {
@@ -32,7 +33,7 @@ export const AdminDashboard = () => {
                 const data = await api.get<DashboardStats>('/dashboard/stats');
                 setStats(data);
             } catch (error) {
-                console.error('Failed to fetch stats', error);
+                errorHandler.handleApiError(error, 'No se pudieron cargar las estadísticas');
             } finally {
                 setLoading(false);
             }

@@ -21,9 +21,16 @@ export interface Section {
     academicYear: number;
 }
 
+export interface Student {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+}
+
 export interface Enrollment {
     id: number;
-    student: any;
+    student: Student;
     section: Section;
     status: string;
     enrolledAt: string;

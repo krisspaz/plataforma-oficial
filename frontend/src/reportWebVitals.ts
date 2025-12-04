@@ -1,6 +1,6 @@
-import { onCLS, onFID, onLCP, onFCP, onTTFB } from 'web-vitals'
+import { onCLS, onFID, onLCP, onFCP, onTTFB, type Metric } from 'web-vitals'
 
-const reportWebVitals = (onPerfEntry?: (metric: any) => void) => {
+const reportWebVitals = (onPerfEntry?: (metric: Metric) => void) => {
     if (onPerfEntry && onPerfEntry instanceof Function) {
         onCLS(onPerfEntry)
         onFID(onPerfEntry)
@@ -11,8 +11,7 @@ const reportWebVitals = (onPerfEntry?: (metric: any) => void) => {
 }
 
 export const logVitals = () => {
-    reportWebVitals(console.log)
-    // Aquí se podría enviar a Google Analytics o endpoint propio
+    // Web vitals can be sent to analytics service
     // reportWebVitals(sendToAnalytics)
 }
 

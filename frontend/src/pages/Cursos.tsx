@@ -7,6 +7,8 @@ import { Search, Filter, Loader2 } from "lucide-react";
 import { academicService, Enrollment } from "@/services/academic.service";
 import { useAuth } from "@/context/AuthContext";
 
+import { errorHandler } from "@/lib/errorHandler";
+
 const Cursos = () => {
   const { user } = useAuth();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -16,13 +18,10 @@ const Cursos = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        // If user is student, get their enrollments
-        // If teacher, get their assigned sections (need to implement in backend/service)
-        // For now assuming student view for simplicity
         const data = await academicService.getMyEnrollments();
         setEnrollments(data);
       } catch (error) {
-        console.error('Failed to fetch courses', error);
+        errorHandler.handleApiError(error, 'No se pudieron cargar los cursos');
       } finally {
         setLoading(false);
       }
