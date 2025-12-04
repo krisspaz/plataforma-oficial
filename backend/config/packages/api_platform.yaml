@@ -1,42 +1,50 @@
-# config/packages/api_platform.yaml
 api_platform:
     title: 'Plataforma Escolar API'
     version: '2.0.0'
     description: 'API REST y GraphQL para la Plataforma de Gestión Escolar'
-    
-    # Formats supported
+
     formats:
-        jsonld:   ['application/ld+json']
-        json:     ['application/json']
-        html:     ['text/html']
-    
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+        html: ['text/html']
+
     # Documentation
-    enable_swagger: true
-    enable_swagger_ui: true
-    enable_re_doc: true
+    enable_swagger: '%kernel.debug%'
+    enable_swagger_ui: '%kernel.debug%'
+    enable_re_doc: false
     enable_entrypoint: true
-    enable_docs: true
-    
-    # GraphQL configuration
+    enable_docs: '%kernel.debug%'
+
     graphql:
         enabled: true
         graphiql:
-            enabled: true
+            enabled: '%kernel.debug%'
         default_ide: 'graphiql'
-        
-    # Pagination
+
     defaults:
         pagination_enabled: true
         pagination_items_per_page: 30
         pagination_maximum_items_per_page: 100
-        
-    # Error handling
+        stateless: true      # 🔒 Seguridad: sin sesiones
+        cache_headers:
+            vary: ['Content-Type', 'Authorization']
+            max_age: 3600
+            shared_max_age: 3600
+
     exception_to_status:
-        # Default mapping
         Symfony\Component\Serializer\Exception\ExceptionInterface: 400
         ApiPlatform\Exception\InvalidArgumentException: 400
         ApiPlatform\Exception\FilterValidationException: 400
         Doctrine\ORM\OptimisticLockException: 409
-        
-    # Cache
-    # cache_metadata: true
+
+    collection:
+        pagination:
+            enabled_parameter_name: pagination
+            items_per_page_parameter_name: perPage
+            page_parameter_name: page
+
+    mapping:
+        paths: ['%kernel.project_dir%/src/Entity']
+
+    csrf:
+        enabled: false

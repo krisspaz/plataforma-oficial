@@ -1,4 +1,15 @@
 lexik_jwt_authentication:
-    secret_key: '%env(resolve:JWT_SECRET_KEY)%'
-    public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
-    pass_phrase: '%env(JWT_PASSPHRASE)%'
+    secret_key:       '%env(resolve:JWT_SECRET_KEY)%'
+    public_key:       '%env(resolve:JWT_PUBLIC_KEY)%'
+    pass_phrase:      '%env(JWT_PASSPHRASE)%'
+    token_ttl:        3600            # 1 hora (recomendado)
+    encoder:
+        signature_algorithm: RS256    # seguro, recomendado
+
+    # Si usas API REST
+    api_platform:
+        enabled: true
+
+    # Si quieres refrescar tokens (opcional)
+    # refresh_token:
+    #     ttl: 2592000 # 30 días

@@ -2,34 +2,31 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Student\Query;
+namespace App\Domain\Student;
 
-use App\Domain\Student\StudentRepositoryInterface;
+use App\Entity\Student;
 
-final readonly class GetAllStudentsQueryHandler
+interface StudentRepositoryInterface
 {
-    public function __construct(
-        private StudentRepositoryInterface $studentRepository,
-    ) {}
+    public function findByEmail(string $email): ?Student;
 
     /**
-     * @return array{students: array, total: int, page: int, perPage: int}
+     * @return Student[]
      */
-    public function handle(int $page = 1, int $perPage = 20): array
-    {
-        $students = $this->studentRepository->findAll();
-        $total = count($students);
+    public function findAll(): array;
 
-        // Simple pagination (in production, use database-level pagination)
-        $offset = ($page - 1) * $perPage;
-        $paginatedStudents = array_slice($students, $offset, $perPage);
+    /**
+     * @param array $criteria
+     * @param array|null $orderBy
+     * @param int|null $limit
+     * @param int|null $offset
+     * @return Student[]
+     */
+    public function findBy(array $criteria = [], ?array $orderBy = null, ?int $limit = null, ?int $offset = null): array;
 
-        return [
-            'students' => $paginatedStudents,
-            'total' => $total,
-            'page' => $page,
-            'perPage' => $perPage,
-            'totalPages' => (int) ceil($total / $perPage),
-        ];
-    }
+    public function count(array $criteria = []): int;
+
+    public function save(Student $student): void;
+
+    public function remove(Student $student): void;
 }

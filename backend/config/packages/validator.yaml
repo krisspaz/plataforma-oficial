@@ -1,11 +1,16 @@
 framework:
     validation:
-        # Enables validator auto-mapping support.
-        # For instance, basic validation constraints will be inferred from Doctrine's metadata.
-        #auto_mapping:
-        #    App\Entity\: []
+        # Habilita auto-mapping de validaciones de entidades automáticamente
+        auto_mapping:
+            App\Entity\: []
+
+        # Configuración general de validación
+        enable_annotations: true
+        mapping:
+            paths: []
 
 when@test:
     framework:
         validation:
+            # Desactiva la verificación de contraseñas comprometidas en tests para no frenar pruebas
             not_compromised_password: false

@@ -1,10 +1,51 @@
-.env
-.env
-.env
-.env.local
-.env.prod
-.env.dev
+# ---- ARCHIVOS DE ENTORNO (NUNCA SE SUBEN) ----
 .env
 .env.*
-*/.env
-*/.env.*
+!.env.example
+
+# ---- SYMFONY ----
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/var/
+/vendor/
+public/bundles/
+
+# JWT Keys
+/config/jwt/*.pem
+
+# ---- FRONTEND (REACT + VITE) ----
+frontend/node_modules/
+frontend/dist/
+/frontend/.env
+/frontend/.env.*
+
+# ---- AI SERVICE (PYTHON + FASTAPI) ----
+ai-service/__pycache__/
+ai-service/.env
+ai-service/.env.*
+ai-service/*.pyc
+
+# ---- DOCKER ----
+/docker-data/
+/docker-compose.override.yml
+
+# ---- SISTEMA GENERAL ----
+node_modules/
+dist/
+build/
+*.log
+
+# macOS files
+.DS_Store
+
+# editor configs
+.idea/
+.vscode/
+
+# ---- TEMP FILES ----
+*.cache
+*.tmp
+*.bak
+*.swp
