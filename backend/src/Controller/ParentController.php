@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
+use App\Controller\Traits\ApiResponseTrait;
 use App\Entity\User;
 use App\Repository\ParentRepository;
 use App\Repository\StudentRepository;
@@ -9,107 +12,101 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use OpenApi\Attributes as OA;
 
 #[Route('/api/parents')]
+#[OA\Tag(name: 'Parents')]
 class ParentController extends AbstractController
 {
+    use ApiResponseTrait;
+
     public function __construct(
-        private ParentRepository $parentRepository,
-        private StudentRepository $studentRepository,
-        private EntityManagerInterface $entityManager
-    ) {
-    }
+        private readonly ParentRepository $parentRepository,
+        private readonly StudentRepository $studentRepository,
+        private readonly EntityManagerInterface $entityManager
+    ) {}
 
     #[Route('', name: 'api_parents_index', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents', summary: 'List all parents')]
     public function index(): JsonResponse
     {
         $parents = $this->parentRepository->findAll();
         
-        return $this->json($parents, Response::HTTP_OK, [], [
-            'groups' => ['parent:read']
-        ]);
+        return $this->success($parents, 200, [], ['parent:read']);
     }
 
     #[Route('/{id}', name: 'api_parents_show', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/{id}', summary: 'Get parent details')]
     public function show(int $id): JsonResponse
     {
         $parent = $this->parentRepository->find($id);
         
         if (!$parent) {
-            return $this->json(['error' => 'Parent not found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Parent');
         }
 
-        return $this->json($parent, Response::HTTP_OK, [], [
-            'groups' => ['parent:read']
-        ]);
+        return $this->success($parent, 200, [], ['parent:read']);
     }
 
     #[Route('/my-children', name: 'api_parents_my_children', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/my-children', summary: 'Get authenticated parent children')]
     public function myChildren(): JsonResponse
     {
         $user = $this->getUser();
-        
         if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            return $this->unauthorized();
         }
 
         $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        
         if (!$parent) {
-            return $this->json(['error' => 'Parent profile not found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Parent profile');
         }
 
         $children = $parent->getStudents();
         
-        return $this->json([
+        return $this->success([
             'children' => $children,
             'count' => count($children)
-        ], Response::HTTP_OK, [], [
-            'groups' => ['student:read']
-        ]);
+        ], 200, [], ['student:read']);
     }
 
     #[Route('/student/{studentId}', name: 'api_parents_by_student', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/student/{studentId}', summary: 'Get parents by student ID')]
     public function byStudent(int $studentId): JsonResponse
     {
         $parents = $this->parentRepository->findByStudent($studentId);
         
-        return $this->json($parents, Response::HTTP_OK, [], [
-            'groups' => ['parent:read']
-        ]);
+        return $this->success($parents, 200, [], ['parent:read']);
     }
 
     #[Route('/search', name: 'api_parents_search', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/search', summary: 'Search parents')]
     public function search(Request $request): JsonResponse
     {
         $query = $request->query->get('q', '');
         
         if (empty($query)) {
-            return $this->json(['error' => 'Search query required'], Response::HTTP_BAD_REQUEST);
+            return $this->validationError(['q' => 'Search query required']);
         }
 
         $parents = $this->parentRepository->search($query);
         
-        return $this->json($parents, Response::HTTP_OK, [], [
-            'groups' => ['parent:read']
-        ]);
+        return $this->success($parents, 200, [], ['parent:read']);
     }
 
     #[Route('/my-payments', name: 'api_parents_my_payments', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/my-payments', summary: 'Get authenticated parent payments')]
     public function myPayments(): JsonResponse
     {
         $user = $this->getUser();
-        
         if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            return $this->unauthorized();
         }
 
         $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        
         if (!$parent) {
-            return $this->json(['error' => 'Parent profile not found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Parent profile');
         }
 
         $allPayments = [];
@@ -132,40 +129,35 @@ class ParentController extends AbstractController
             }
         }
 
-        return $this->json([
+        return $this->success([
             'payments' => $allPayments,
             'summary' => [
                 'total_pending' => $totalPending,
                 'total_paid' => $totalPaid,
                 'count' => count($allPayments)
             ]
-        ], Response::HTTP_OK, [], [
-            'groups' => ['payment:read']
-        ]);
+        ], 200, [], ['payment:read']);
     }
 
     #[Route('/my-contracts', name: 'api_parents_my_contracts', methods: ['GET'])]
+    #[OA\Get(path: '/api/parents/my-contracts', summary: 'Get authenticated parent contracts')]
     public function myContracts(): JsonResponse
     {
         $user = $this->getUser();
-        
         if (!$user instanceof User) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            return $this->unauthorized();
         }
 
         $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        
         if (!$parent) {
-            return $this->json(['error' => 'Parent profile not found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Parent profile');
         }
 
         $contracts = $parent->getContracts();
         
-        return $this->json([
+        return $this->success([
             'contracts' => $contracts,
             'count' => count($contracts)
-        ], Response::HTTP_OK, [], [
-            'groups' => ['contract:read']
-        ]);
+        ], 200, [], ['contract:read']);
     }
 }

@@ -109,7 +109,7 @@ class NotificationService
         $this->entityManager->flush();
     }
 
-    public function markAllAsRead(User $user): void
+    public function markAllAsRead(User $user): int
     {
         $notifications = $this->entityManager->getRepository(Notification::class)
             ->findBy(['user' => $user, 'read' => false]);
@@ -118,6 +118,14 @@ class NotificationService
             $notification->markAsRead();
         }
 
+        $this->entityManager->flush();
+
+        return count($notifications);
+    }
+
+    public function delete(Notification $notification): void
+    {
+        $this->entityManager->remove($notification);
         $this->entityManager->flush();
     }
 

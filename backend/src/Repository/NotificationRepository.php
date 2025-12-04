@@ -45,4 +45,32 @@ class NotificationRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    /**
+     * Find paginated notifications for user
+     */
+    public function findPaginatedByUser(int $userId, int $page, int $limit): array
+    {
+        return $this->createQueryBuilder('n')
+            ->where('n.user = :userId')
+            ->setParameter('userId', $userId)
+            ->orderBy('n.createdAt', 'DESC')
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Count notifications for user
+     */
+    public function countByUser(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('n')
+            ->select('COUNT(n.id)')
+            ->where('n.user = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

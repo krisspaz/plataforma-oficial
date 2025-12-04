@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 #[Route('/api')]
 class AuthController extends AbstractController
@@ -18,7 +20,9 @@ class AuthController extends AbstractController
     public function __construct(
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private RateLimiterFactory $registrationLimiter,
+        private RateLimiterFactory $passwordResetLimiter
     ) {}
 
     // ===== Helpers =====
@@ -56,6 +60,12 @@ class AuthController extends AbstractController
     #[Route('/register', name: 'api_register', methods: ['POST'])]
     public function register(Request $request): JsonResponse
     {
+        // Rate Limiting
+        $limiter = $this->registrationLimiter->create($request->getClientIp());
+        if (false === $limiter->consume(1)->isAccepted()) {
+            throw new TooManyRequestsHttpException();
+        }
+
         $data = json_decode($request->getContent(), true);
 
         $user = new User();
@@ -141,6 +151,12 @@ class AuthController extends AbstractController
     #[Route('/change-password', name: 'api_change_password', methods: ['POST'])]
     public function changePassword(Request $request): JsonResponse
     {
+        // Rate Limiting
+        $limiter = $this->passwordResetLimiter->create($request->getClientIp());
+        if (false === $limiter->consume(1)->isAccepted()) {
+            throw new TooManyRequestsHttpException();
+        }
+
         $user = $this->getUser();
         if (!$user instanceof User) return $this->respondNotAuthenticated();
 

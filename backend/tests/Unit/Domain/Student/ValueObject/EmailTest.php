@@ -11,19 +11,19 @@ class EmailTest extends TestCase
 {
     public function testCanCreateValidEmail(): void
     {
-        $email = new Email('test@example.com');
-        $this->assertEquals('test@example.com', $email->getValue());
+        $email = Email::fromString('test@example.com');
+        $this->assertEquals('test@example.com', (string) $email);
     }
 
     public function testCannotCreateInvalidEmail(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new Email('invalid-email');
+        Email::fromString('invalid-email');
     }
 
     public function testNormalization(): void
     {
-        $email = new Email('  Test@Example.COM  ');
-        $this->assertEquals('test@example.com', $email->getValue());
+        $email = Email::fromString('  Test@Example.COM  ');
+        $this->assertEquals('test@example.com', (string) $email);
     }
 }

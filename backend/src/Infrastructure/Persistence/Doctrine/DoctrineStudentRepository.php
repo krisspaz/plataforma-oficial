@@ -8,13 +8,13 @@ use App\Domain\Student\StudentRepositoryInterface;
 use App\Domain\Student\ValueObject\StudentId;
 use App\Domain\Student\ValueObject\Email;
 use App\Entity\Student;
-use App\Repository\StudentRepository as DoctrineStudentRepository;
+use App\Repository\StudentRepository as DoctrineOrmStudentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class DoctrineStudentRepository implements StudentRepositoryInterface
 {
     public function __construct(
-        private DoctrineStudentRepository $doctrineRepository,
+        private DoctrineOrmStudentRepository $doctrineRepository,
         private EntityManagerInterface $entityManager,
     ) {}
 
@@ -52,6 +52,16 @@ final readonly class DoctrineStudentRepository implements StudentRepositoryInter
     public function search(string $query): array
     {
         return $this->doctrineRepository->search($query);
+    }
+
+    public function findBy(array $criteria, ?array $orderBy = null, ?int $limit = null, ?int $offset = null): array
+    {
+        return $this->doctrineRepository->findBy($criteria, $orderBy, $limit, $offset);
+    }
+
+    public function count(array $criteria = []): int
+    {
+        return $this->doctrineRepository->count($criteria);
     }
 
     public function delete(Student $student): void

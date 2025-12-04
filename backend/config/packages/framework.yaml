@@ -14,11 +14,11 @@ framework:
 
     # Serializer, recomendado para API Platform
     serializer:
-        enable_annotations: false
+        enabled: true
 
     # Validation
     validation:
-        enable_annotations: false
+        enabled: true
 
     # Translator (desactiva si no usas traducciones)
     translator:

@@ -34,5 +34,16 @@ interface StudentRepositoryInterface
 
     public function delete(Student $student): void;
 
+    /**
+     * @param array $criteria
+     * @param array|null $orderBy
+     * @param int|null $limit
+     * @param int|null $offset
+     * @return Student[]
+     */
+    public function findBy(array $criteria, ?array $orderBy = null, ?int $limit = null, ?int $offset = null): array;
+
+    public function count(array $criteria = []): int;
+
     public function nextIdentity(): StudentId;
 }

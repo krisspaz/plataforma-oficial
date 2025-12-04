@@ -11,24 +11,23 @@ class StudentIdTest extends TestCase
 {
     public function testCanCreateValidStudentId(): void
     {
-        $id = new StudentId(123);
-        $this->assertEquals(123, $id->getValue());
-        $this->assertEquals('123', (string) $id);
+        $id = StudentId::fromInt(1);
+        $this->assertEquals(1, $id->toInt());
     }
 
     public function testCannotCreateInvalidStudentId(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new StudentId(-1);
+        StudentId::fromInt(0);
     }
 
     public function testEquality(): void
     {
-        $id1 = new StudentId(100);
-        $id2 = new StudentId(100);
-        $id3 = new StudentId(200);
+        $id1 = StudentId::fromInt(1);
+        $id2 = StudentId::fromInt(1);
+        $id3 = StudentId::fromInt(2);
 
-        $this->assertTrue($id1->equals($id2));
-        $this->assertFalse($id1->equals($id3));
+        $this->assertEquals($id1, $id2); // Objects are not identical but equal in value if properties match
+        $this->assertNotEquals($id1, $id3);
     }
 }

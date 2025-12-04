@@ -61,4 +61,35 @@ class EnrollmentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Count active enrollments by year
+     */
+    public function countActiveByYear(int $academicYear): int
+    {
+        return (int) $this->createQueryBuilder('e')
+            ->select('COUNT(e.id)')
+            ->where('e.academicYear = :year')
+            ->andWhere('e.status = :status')
+            ->setParameter('year', $academicYear)
+            ->setParameter('status', 'active')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Find recent active enrollments by year
+     */
+    public function findRecentActiveByYear(int $academicYear, int $limit = 10): array
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.academicYear = :year')
+            ->andWhere('e.status = :status')
+            ->setParameter('year', $academicYear)
+            ->setParameter('status', 'active')
+            ->orderBy('e.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

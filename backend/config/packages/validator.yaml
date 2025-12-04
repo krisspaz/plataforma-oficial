@@ -5,7 +5,6 @@ framework:
             App\Entity\: []
 
         # Configuración general de validación
-        enable_annotations: true
         mapping:
             paths: []
 

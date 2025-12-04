@@ -16,7 +16,9 @@ final readonly class Email
 
     public static function fromString(string $email): self
     {
-        return new self($email);
+        // Normalize: trim and lowercase
+        $normalized = strtolower(trim($email));
+        return new self($normalized);
     }
 
     private function validate(): void

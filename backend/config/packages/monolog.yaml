@@ -87,4 +87,4 @@ when@prod:
             class: Sentry\Monolog\Handler
             arguments:
                 - '@Sentry\State\HubInterface'
-                - !php/const Monolog\Logger::ERROR
+                - 400 # ERROR

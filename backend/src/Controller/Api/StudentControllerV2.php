@@ -11,6 +11,7 @@ use App\Application\Student\Query\GetStudentByIdQueryHandler;
 use App\Application\Student\Query\GetAllStudentsQueryHandler;
 use App\Application\Student\DTO\CreateStudentDTO;
 use App\Application\Student\DTO\UpdateStudentDTO;
+use App\Controller\Traits\ApiResponseTrait;
 use App\Domain\Exception\StudentNotFoundException;
 use App\Domain\Exception\DuplicateStudentException;
 use Nelmio\ApiDocBundle\Annotation\Model;
@@ -18,7 +19,6 @@ use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -28,6 +28,8 @@ use Psr\Log\LoggerInterface;
 #[OA\Tag(name: 'Students V2')]
 final class StudentControllerV2 extends AbstractController
 {
+    use ApiResponseTrait;
+
     private const MAX_PER_PAGE = 100;
     private const DEFAULT_PER_PAGE = 20;
     private const MIN_PER_PAGE = 1;
@@ -84,10 +86,7 @@ final class StudentControllerV2 extends AbstractController
             // Validar DTO
             $errors = $this->validator->validate($dto);
             if (count($errors) > 0) {
-                return $this->json([
-                    'error' => 'Validation failed',
-                    'details' => $this->formatValidationErrors($errors)
-                ], Response::HTTP_BAD_REQUEST);
+                return $this->validationError($this->formatValidationErrors($errors));
             }
 
             $student = $this->createStudentHandler->handle($dto);
@@ -97,9 +96,7 @@ final class StudentControllerV2 extends AbstractController
                 'email' => $student->getEmail()
             ]);
 
-            return $this->json($student, Response::HTTP_CREATED, [], [
-                'groups' => ['student:read']
-            ]);
+            return $this->success($student, 201, [], ['student:read']);
 
         } catch (DuplicateStudentException $e) {
             $this->logger->warning('Attempt to create duplicate student', [
@@ -107,22 +104,13 @@ final class StudentControllerV2 extends AbstractController
                 'message' => $e->getMessage()
             ]);
             
-            return $this->json([
-                'error' => 'Student already exists',
-                'message' => $e->getMessage()
-            ], Response::HTTP_CONFLICT);
+            return $this->error('Student already exists', 409, $e->getMessage());
 
         } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => 'Invalid input',
-                'message' => $e->getMessage()
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->error('Invalid input', 400, $e->getMessage());
 
         } catch (\JsonException $e) {
-            return $this->json([
-                'error' => 'Invalid JSON format',
-                'message' => $e->getMessage()
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->error('Invalid JSON format', 400, $e->getMessage());
 
         } catch (\Throwable $e) {
             $this->logger->error('Error creating student', [
@@ -130,12 +118,11 @@ final class StudentControllerV2 extends AbstractController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return $this->json([
-                'error' => 'An error occurred while creating the student',
-                'message' => $this->getParameter('kernel.environment') === 'dev' 
-                    ? $e->getMessage() 
-                    : 'Please contact support'
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->error(
+                'An error occurred while creating the student', 
+                500, 
+                $this->getParameter('kernel.environment') === 'dev' ? $e->getMessage() : 'Please contact support'
+            );
         }
     }
 
@@ -166,30 +153,19 @@ final class StudentControllerV2 extends AbstractController
     {
         try {
             if ($id <= 0) {
-                return $this->json([
-                    'error' => 'Invalid student ID',
-                    'message' => 'Student ID must be a positive integer'
-                ], Response::HTTP_BAD_REQUEST);
+                return $this->error('Invalid student ID', 400, 'Student ID must be a positive integer');
             }
 
             $student = $this->getStudentByIdHandler->handle($id);
 
             if (!$student) {
-                return $this->json([
-                    'error' => 'Student not found',
-                    'message' => sprintf('No student found with ID: %d', $id)
-                ], Response::HTTP_NOT_FOUND);
+                return $this->notFound('Student');
             }
 
-            return $this->json($student, Response::HTTP_OK, [], [
-                'groups' => ['student:read']
-            ]);
+            return $this->success($student, 200, [], ['student:read']);
 
         } catch (StudentNotFoundException $e) {
-            return $this->json([
-                'error' => 'Student not found',
-                'message' => $e->getMessage()
-            ], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Student');
 
         } catch (\Throwable $e) {
             $this->logger->error('Error fetching student', [
@@ -197,9 +173,7 @@ final class StudentControllerV2 extends AbstractController
                 'error' => $e->getMessage()
             ]);
 
-            return $this->json([
-                'error' => 'An error occurred while fetching the student'
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->error('An error occurred while fetching the student', 500);
         }
     }
 
@@ -276,10 +250,7 @@ final class StudentControllerV2 extends AbstractController
             // Validar parámetros
             $validationErrors = $this->validateListParameters($page, $perPage, $sortBy, $sortOrder);
             if (!empty($validationErrors)) {
-                return $this->json([
-                    'error' => 'Invalid query parameters',
-                    'details' => $validationErrors
-                ], Response::HTTP_BAD_REQUEST);
+                return $this->validationError($validationErrors);
             }
 
             // Normalizar perPage
@@ -294,15 +265,10 @@ final class StudentControllerV2 extends AbstractController
                 sortOrder: $sortOrder
             );
 
-            return $this->json($result, Response::HTTP_OK, [], [
-                'groups' => ['student:read']
-            ]);
+            return $this->success($result, 200, [], ['student:read']);
 
         } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => 'Invalid parameters',
-                'message' => $e->getMessage()
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->error('Invalid parameters', 400, $e->getMessage());
 
         } catch (\Throwable $e) {
             $this->logger->error('Error listing students', [
@@ -310,9 +276,7 @@ final class StudentControllerV2 extends AbstractController
                 'params' => $request->query->all()
             ]);
 
-            return $this->json([
-                'error' => 'An error occurred while listing students'
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->error('An error occurred while listing students', 500);
         }
     }
 
@@ -359,10 +323,7 @@ final class StudentControllerV2 extends AbstractController
 
             $errors = $this->validator->validate($dto);
             if (count($errors) > 0) {
-                return $this->json([
-                    'error' => 'Validation failed',
-                    'details' => $this->formatValidationErrors($errors)
-                ], Response::HTTP_BAD_REQUEST);
+                return $this->validationError($this->formatValidationErrors($errors));
             }
 
             $student = $this->updateStudentHandler->handle($dto);
@@ -371,21 +332,13 @@ final class StudentControllerV2 extends AbstractController
                 'student_id' => $id
             ]);
 
-            return $this->json($student, Response::HTTP_OK, [], [
-                'groups' => ['student:read']
-            ]);
+            return $this->success($student, 200, [], ['student:read']);
 
         } catch (StudentNotFoundException $e) {
-            return $this->json([
-                'error' => 'Student not found',
-                'message' => $e->getMessage()
-            ], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Student');
 
         } catch (\InvalidArgumentException | \JsonException $e) {
-            return $this->json([
-                'error' => 'Invalid input',
-                'message' => $e->getMessage()
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->error('Invalid input', 400, $e->getMessage());
 
         } catch (\Throwable $e) {
             $this->logger->error('Error updating student', [
@@ -393,9 +346,7 @@ final class StudentControllerV2 extends AbstractController
                 'error' => $e->getMessage()
             ]);
 
-            return $this->json([
-                'error' => 'An error occurred while updating the student'
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->error('An error occurred while updating the student', 500);
         }
     }
 
@@ -426,13 +377,10 @@ final class StudentControllerV2 extends AbstractController
                 'student_id' => $id
             ]);
 
-            return $this->json(null, Response::HTTP_NO_CONTENT);
+            return $this->json(null, 204);
 
         } catch (StudentNotFoundException $e) {
-            return $this->json([
-                'error' => 'Student not found',
-                'message' => $e->getMessage()
-            ], Response::HTTP_NOT_FOUND);
+            return $this->notFound('Student');
 
         } catch (\Throwable $e) {
             $this->logger->error('Error deleting student', [
@@ -440,9 +388,7 @@ final class StudentControllerV2 extends AbstractController
                 'error' => $e->getMessage()
             ]);
 
-            return $this->json([
-                'error' => 'An error occurred while deleting the student'
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->error('An error occurred while deleting the student', 500);
         }
     }
 

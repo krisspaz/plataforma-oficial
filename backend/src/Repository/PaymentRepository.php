@@ -79,4 +79,32 @@ class PaymentRepository extends ServiceEntityRepository
 
         return (float) ($result ?? 0);
     }
+
+    /**
+     * Count pending payments
+     */
+    public function countPending(): int
+    {
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->where('p.status = :status')
+            ->setParameter('status', 'pending')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Count overdue payments
+     */
+    public function countOverdue(): int
+    {
+        return (int) $this->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->where('p.status = :status')
+            ->andWhere('p.dueDate < :today')
+            ->setParameter('status', 'pending')
+            ->setParameter('today', new \DateTime())
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

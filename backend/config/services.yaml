@@ -1,14 +1,20 @@
-# config/services.yaml
+# This file is the entry point to configure your own services.
+# Files in the packages/ subdirectory configure your dependencies.
+
+# Put parameters here that don't need to change on each machine where the app is deployed
+# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
-    # Puedes definir aquí parámetros globales reutilizables si los necesitas
 
 services:
+    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Symfony resolverá automáticamente las dependencias
-        autoconfigure: true # Symfony aplicará automáticamente tags como controller.service_arguments, event_listener, etc.
-        public: false       # Por default, todos los servicios son privados (buena práctica)
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        bind:
+            $projectDir: '%kernel.project_dir%'
 
-    # Exponer todos los servicios de src/ excepto lo que no deba ser tratado como servicio
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
         exclude:
@@ -16,36 +22,60 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Repositorios de dominio (interface → implementación)
-    App\Domain\Student\StudentRepositoryInterface:
-        class: App\Infrastructure\Persistence\Doctrine\DoctrineStudentRepository
+    # add more service definitions when explicit configuration is needed
+    # please note that last definitions always *replace* previous ones
 
-    # Application Services - Commands
+    # Payment Services
+    App\Service\Payment\StripePaymentService:
+        arguments:
+            $secretKey: '%env(STRIPE_SECRET_KEY)%'
+            $webhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+
+    App\Service\Payment\PayPalPaymentService:
+        arguments:
+            $clientId: '%env(PAYPAL_CLIENT_ID)%'
+            $clientSecret: '%env(PAYPAL_CLIENT_SECRET)%'
+            $mode: '%env(PAYPAL_MODE)%'
+
+    App\Service\Payment\BACPaymentService:
+        arguments:
+            $merchantId: '%env(BAC_MERCHANT_ID)%'
+            $apiKey: '%env(BAC_API_KEY)%'
+            $apiSecret: '%env(BAC_API_SECRET)%'
+            $mode: '%env(default:BAC_MODE:sandbox)%'
+
+    # Secret Rotation Service
+    App\Service\SecretRotationService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    # Command Handlers
     App\Application\Student\Command\CreateStudentCommandHandler:
-        arguments:
-            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
-            $entityManager: '@doctrine.orm.entity_manager'
-            $passwordHasher: '@Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface'
-            $eventDispatcher: '@event_dispatcher'
-            $validator: '@validator'
+        tags: ['messenger.message_handler']
 
-    # Application Services - Queries
-    App\Application\Student\Query\GetStudentByIdQueryHandler:
-        arguments:
-            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
+    App\Application\Student\Command\UpdateStudentCommandHandler:
+        tags: ['messenger.message_handler']
 
-    App\Application\Student\Query\GetAllStudentsQueryHandler:
-        arguments:
-            $studentRepository: '@App\Domain\Student\StudentRepositoryInterface'
+    App\Application\Student\Command\DeleteStudentCommandHandler:
+        tags: ['messenger.message_handler']
 
-    # Event Listeners
-    App\Infrastructure\EventListener\StudentCreatedEventListener:
-        tags:
-            - { name: kernel.event_listener, event: student.created, method: onStudentCreated }
+    # Monolog Channels
+    monolog.logger.payment:
+        class: Psr\Log\LoggerInterface
+        factory: ['@monolog.logger_prototype', 'withName']
+        arguments: ['payment']
 
-    # Controllers (ya están autoconfigurados por default, pero explicitar el tag no está mal)
-    App\Controller\:
-        resource: '../src/Controller/'
-        tags: ['controller.service_arguments']
+    monolog.logger.webhook:
+        class: Psr\Log\LoggerInterface
+        factory: ['@monolog.logger_prototype', 'withName']
+        arguments: ['webhook']
 
- 
+    monolog.logger.security:
+        class: Psr\Log\LoggerInterface
+        factory: ['@monolog.logger_prototype', 'withName']
+        arguments: ['security']
+
+    monolog.logger.audit:
+        class: Psr\Log\LoggerInterface
+        factory: ['@monolog.logger_prototype', 'withName']
+        arguments: ['audit']
