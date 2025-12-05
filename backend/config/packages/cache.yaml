@@ -46,6 +46,11 @@ framework:
                 default_lifetime: 300
                 tags: true
 
+            # Rate limiter cache
+            rate_limiter.cache:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+
 when@dev:
     framework:
         cache:

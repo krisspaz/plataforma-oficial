@@ -3,7 +3,6 @@
 # Carga automática de todos los controllers usando atributos
 controllers:
     resource: '../src/Controller/'
-    namespace: 'App\Controller'
     type: attribute
 
 # Ruta para login vía API (JWT)
@@ -12,7 +11,7 @@ api_login_check:
     methods: [POST]
 
 # Opcional: asegurar que todas las rutas de la API estén bajo /api
-api_platform:
-    resource: '.'
-    type: api_platform
-    prefix: /api
+# api_platform:
+#     resource: '.'
+#     type: api_platform
+#     prefix: /api

@@ -12,6 +12,8 @@ services:
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
         bind:
             $projectDir: '%kernel.project_dir%'
+            $contractsDirectory: '%kernel.project_dir%/var/contracts'
+            $senderEmail: '%env(default:mailer_from:MAILER_FROM_EMAIL)%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
@@ -49,33 +51,8 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
-    # Command Handlers
-    App\Application\Student\Command\CreateStudentCommandHandler:
-        tags: ['messenger.message_handler']
+    # Command Handlers - Registered as normal services (not Messenger handlers)
+    # They are used directly by controllers, not through the message bus
 
-    App\Application\Student\Command\UpdateStudentCommandHandler:
-        tags: ['messenger.message_handler']
-
-    App\Application\Student\Command\DeleteStudentCommandHandler:
-        tags: ['messenger.message_handler']
-
-    # Monolog Channels
-    monolog.logger.payment:
-        class: Psr\Log\LoggerInterface
-        factory: ['@monolog.logger_prototype', 'withName']
-        arguments: ['payment']
-
-    monolog.logger.webhook:
-        class: Psr\Log\LoggerInterface
-        factory: ['@monolog.logger_prototype', 'withName']
-        arguments: ['webhook']
-
-    monolog.logger.security:
-        class: Psr\Log\LoggerInterface
-        factory: ['@monolog.logger_prototype', 'withName']
-        arguments: ['security']
-
-    monolog.logger.audit:
-        class: Psr\Log\LoggerInterface
-        factory: ['@monolog.logger_prototype', 'withName']
-        arguments: ['audit']
+    # Note: Custom monolog channels should be configured in config/packages/monolog.yaml
+    # using the 'channels' key, not as factories here

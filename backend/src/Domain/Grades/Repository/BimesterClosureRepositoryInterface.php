@@ -11,7 +11,7 @@ interface BimesterClosureRepositoryInterface
 {
     public function save(BimesterClosure $closure): void;
 
-    public function find(Grade $grade, int $bimester, int $academicYear): ?BimesterClosure;
+    public function findByCriteria(Grade $grade, int $bimester, int $academicYear): ?BimesterClosure;
 
     public function findByGrade(Grade $grade, int $academicYear): array;
 

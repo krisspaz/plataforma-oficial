@@ -14,7 +14,7 @@ final readonly class GetStudentByIdQueryHandler
         private StudentRepositoryInterface $studentRepository,
     ) {}
 
-    public function handle(int $id): ?Student
+    public function __invoke(int $id): ?Student
     {
         $studentId = StudentId::fromInt($id);
         return $this->studentRepository->findById($studentId);

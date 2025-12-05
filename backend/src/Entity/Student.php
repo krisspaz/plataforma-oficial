@@ -70,9 +70,24 @@ class Student
     #[Groups(['student:read', 'student:write', 'student:item'])]
     private ?string $status = 'active';
 
+    #[ORM\OneToOne(inversedBy: 'student', cascade: ['persist', 'remove'])]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?User $user = null;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['student:read', 'student:item'])]
     private ?\DateTimeInterface $createdAt = null;
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): static
+    {
+        $this->user = $user;
+        return $this;
+    }
 
     public function __construct()
     {

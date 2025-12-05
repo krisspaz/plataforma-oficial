@@ -24,7 +24,7 @@ class DoctrineBimesterClosureRepository extends ServiceEntityRepository implemen
         $em->flush();
     }
 
-    public function find(Grade $grade, int $bimester, int $academicYear): ?BimesterClosure
+    public function findByCriteria(Grade $grade, int $bimester, int $academicYear): ?BimesterClosure
     {
         return $this->findOneBy([
             'grade' => $grade,
@@ -43,7 +43,7 @@ class DoctrineBimesterClosureRepository extends ServiceEntityRepository implemen
 
     public function isClosed(Grade $grade, int $bimester, int $academicYear): bool
     {
-        $closure = $this->find($grade, $bimester, $academicYear);
+        $closure = $this->findByCriteria($grade, $bimester, $academicYear);
         return $closure !== null && $closure->isClosed();
     }
 }

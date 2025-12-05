@@ -24,8 +24,21 @@ import { GenerarContrato } from "./pages/secretaria/GenerarContrato";
 // Coordinación
 import { NuevoAnuncio } from "./pages/coordinacion/NuevoAnuncio";
 
+// Administración
+import Finanzas from "./pages/administracion/Finanzas";
+import Estadisticas from "./pages/administracion/Estadisticas";
+import Reportes from "./pages/administracion/Reportes";
+
 // Maestros
 import { NuevaActividad } from "./pages/maestros/NuevaActividad";
+import Actividades from "./pages/maestros/Actividades";
+import Materiales from "./pages/maestros/Materiales";
+import CalendarioMaestros from "./pages/maestros/Calendario";
+
+// Padres
+import Cuenta from "./pages/padres/Cuenta";
+import TareasPadres from "./pages/padres/Tareas";
+import Contratos from "./pages/padres/Contratos";
 
 const queryClient = new QueryClient();
 
@@ -62,13 +75,23 @@ const App = () => (
 
                 {/* Maestros Routes */}
                 <Route path="/maestros" element={<Index />} />
+                <Route path="/maestros/actividades" element={<Actividades />} />
                 <Route path="/maestros/actividades/nueva" element={<NuevaActividad />} />
+                <Route path="/maestros/notas" element={<Index />} />
+                <Route path="/maestros/materiales" element={<Materiales />} />
+                <Route path="/maestros/calendario" element={<CalendarioMaestros />} />
 
                 {/* Padres Routes */}
                 <Route path="/padres" element={<Index />} />
+                <Route path="/padres/cuenta" element={<Cuenta />} />
+                <Route path="/padres/tareas" element={<TareasPadres />} />
+                <Route path="/padres/contratos" element={<Contratos />} />
 
                 {/* Administración Routes */}
                 <Route path="/administracion" element={<Index />} />
+                <Route path="/administracion/finanzas" element={<Finanzas />} />
+                <Route path="/administracion/estadisticas" element={<Estadisticas />} />
+                <Route path="/administracion/reportes" element={<Reportes />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

@@ -30,7 +30,7 @@ final readonly class CreateStudentCommandHandler
         private string $senderEmail // Configurado desde services.yaml o env
     ) {}
 
-    public function handle(CreateStudentDTO $dto): Student
+    public function __invoke(CreateStudentDTO $dto): Student
     {
         // 1️⃣ Validar DTO
         $violations = $this->validator->validate($dto);

@@ -20,7 +20,7 @@ final readonly class UpdateStudentCommandHandler
         private ValidatorInterface $validator,
     ) {}
 
-    public function handle(UpdateStudentDTO $dto): Student
+    public function __invoke(UpdateStudentDTO $dto): Student
     {
         // Validar DTO
         $violations = $this->validator->validate($dto);

@@ -12,7 +12,7 @@ final readonly class GetAllStudentsQueryHandler
         private StudentRepositoryInterface $studentRepository,
     ) {}
 
-    public function handle(int $page = 1, int $perPage = 20, ?string $search = null, string $sortBy = 'id', string $sortOrder = 'asc'): array
+    public function __invoke(int $page = 1, int $perPage = 20, ?string $search = null, string $sortBy = 'id', string $sortOrder = 'asc'): array
     {
         $criteria = [];
         if ($search) {

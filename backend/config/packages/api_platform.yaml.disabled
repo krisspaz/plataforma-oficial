@@ -39,6 +39,3 @@ api_platform:
             enabled_parameter_name: pagination
             items_per_page_parameter_name: perPage
             page_parameter_name: page
-
-    mapping:
-        paths: ['%kernel.project_dir%/src/Entity']

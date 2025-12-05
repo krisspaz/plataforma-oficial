@@ -119,8 +119,11 @@ export const Sidebar = () => {
               {user?.firstName} {user?.lastName}
             </p>
             <p className="text-xs text-sidebar-foreground/60 truncate">
-              {user?.roles.includes('ROLE_ADMIN') ? 'Administrador' :
-                user?.roles.includes('ROLE_MAESTRO') ? 'Maestro' : 'Estudiante'}
+              {user?.roles.includes('ROLE_ADMIN') || user?.roles.includes('ROLE_ADMIN_SISTEMAS') ? 'Administrador' :
+                user?.roles.includes('ROLE_MAESTRO') || user?.roles.includes('ROLE_TEACHER') ? 'Maestro' :
+                  user?.roles.includes('ROLE_PADRE_FAMILIA') || user?.roles.includes('ROLE_PARENT') ? 'Padre/Madre' :
+                    user?.roles.includes('ROLE_SECRETARIA') ? 'Secretaría' :
+                      user?.roles.includes('ROLE_COORDINACION') ? 'Coordinador' : 'Estudiante'}
             </p>
           </div>
         </div>

@@ -15,7 +15,7 @@ final readonly class DeleteStudentCommandHandler
         private EntityManagerInterface $entityManager,
     ) {}
 
-    public function handle(int $studentId): void
+    public function __invoke(int $studentId): void
     {
         $student = $this->studentRepository->findById($studentId);
 
