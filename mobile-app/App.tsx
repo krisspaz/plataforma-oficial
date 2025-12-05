@@ -5,8 +5,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Screens (Placeholders)
-import LoginScreen from './src/screens/auth/LoginScreen';
+// Screens - Universal (optimizadas para iPhone y iPad)
+import UniversalLoginScreen from './src/screens/auth/UniversalLoginScreen';
+import UniversalDashboardScreen from './src/screens/dashboard/UniversalDashboardScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
 import GradesScreen from './src/screens/academic/GradesScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
@@ -17,7 +18,7 @@ const Tab = createBottomTabNavigator();
 function MainTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Inicio" component={HomeScreen} />
+      <Tab.Screen name="Inicio" component={UniversalDashboardScreen} />
       <Tab.Screen name="Notas" component={GradesScreen} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
@@ -35,7 +36,7 @@ export default function App() {
           {isAuthenticated ? (
             <Stack.Screen name="Main" component={MainTabs} />
           ) : (
-            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Login" component={UniversalLoginScreen} />
           )}
         </Stack.Navigator>
         <StatusBar style="auto" />
