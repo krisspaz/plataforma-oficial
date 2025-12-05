@@ -1,17 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
-use App\Entity\Enrollment;
-use App\Repository\EnrollmentRepository;
-use App\Repository\StudentRepository;
-use App\Repository\SectionRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Application\Enrollment\Command\CancelEnrollmentCommand;
+use App\Application\Enrollment\Command\CreateEnrollmentCommand;
+use App\Application\Enrollment\Command\UpdateEnrollmentCommand;
+use App\Application\Enrollment\Query\GetEnrollmentByIdQuery;
+use App\Application\Enrollment\Query\GetEnrollmentsByStudentQuery;
+use App\Application\Enrollment\Query\GetEnrollmentsQuery;
+use App\Application\Enrollment\Query\GetEnrollmentStatsByGradeQuery;
+use App\Controller\Traits\ApiResponseTrait;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
-use App\Controller\Traits\ApiResponseTrait;
 
 #[Route('/api/enrollments')]
 class EnrollmentController extends AbstractController
@@ -19,17 +25,15 @@ class EnrollmentController extends AbstractController
     use ApiResponseTrait;
 
     public function __construct(
-        private EnrollmentRepository $enrollmentRepository,
-        private StudentRepository $studentRepository,
-        private SectionRepository $sectionRepository,
-        private EntityManagerInterface $entityManager
+        private readonly MessageBusInterface $queryBus,
+        private readonly MessageBusInterface $commandBus
     ) {}
 
     #[Route('', name: 'api_enrollments_index', methods: ['GET'])]
     public function index(Request $request)
     {
         $year = $request->query->getInt('year', (int) date('Y'));
-        $enrollments = $this->enrollmentRepository->findActiveByYear($year);
+        $enrollments = $this->handleQuery(new GetEnrollmentsQuery($year));
 
         return $this->success($enrollments);
     }
@@ -37,7 +41,7 @@ class EnrollmentController extends AbstractController
     #[Route('/{id}', name: 'api_enrollments_show', methods: ['GET'])]
     public function show(int $id)
     {
-        $enrollment = $this->enrollmentRepository->find($id);
+        $enrollment = $this->handleQuery(new GetEnrollmentByIdQuery($id));
 
         if (!$enrollment) {
             return $this->error('Enrollment not found', Response::HTTP_NOT_FOUND);
@@ -55,62 +59,36 @@ class EnrollmentController extends AbstractController
             return $this->error('Student ID and Section ID are required', Response::HTTP_BAD_REQUEST);
         }
 
-        $student = $this->studentRepository->find($data['studentId']);
-        if (!$student) return $this->error('Student not found', Response::HTTP_NOT_FOUND);
+        $command = new CreateEnrollmentCommand(
+            studentId: (int) $data['studentId'],
+            sectionId: (int) $data['sectionId']
+        );
 
-        $section = $this->sectionRepository->find($data['sectionId']);
-        if (!$section) return $this->error('Section not found', Response::HTTP_NOT_FOUND);
+        $result = $this->handleCommand($command);
 
-        if (!$section->hasAvailableSpace()) {
-            return $this->error('Section is full', Response::HTTP_BAD_REQUEST, [
-                'capacity' => $section->getCapacity(),
-                'current' => $section->getCurrentEnrollmentCount()
-            ]);
+        if (isset($result['error'])) {
+            return $this->error($result['error'], $result['code'], $result['details'] ?? []);
         }
 
-        $existingEnrollments = $this->enrollmentRepository->findBy([
-            'student' => $student,
-            'academicYear' => $section->getAcademicYear(),
-            'status' => 'active'
-        ]);
-
-        if (!empty($existingEnrollments)) {
-            return $this->error('Student is already enrolled for this academic year', Response::HTTP_BAD_REQUEST);
-        }
-
-        $enrollment = new Enrollment();
-        $enrollment->setStudent($student);
-        $enrollment->setGrade($section->getGrade());
-        $enrollment->setSection($section);
-        $enrollment->setAcademicYear($section->getAcademicYear());
-        $enrollment->setStatus('active');
-        $enrollment->setEnrollmentDate(new \DateTime());
-
-        $this->entityManager->persist($enrollment);
-        $this->entityManager->flush();
-
-        return $this->success($enrollment, Response::HTTP_CREATED);
+        return $this->success($result['enrollment'], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'api_enrollments_update', methods: ['PUT'])]
     public function update(int $id, Request $request)
     {
-        $enrollment = $this->enrollmentRepository->find($id);
-        if (!$enrollment) return $this->error('Enrollment not found', Response::HTTP_NOT_FOUND);
-
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['status'])) $enrollment->setStatus($data['status']);
+        $command = new UpdateEnrollmentCommand(
+            enrollmentId: $id,
+            status: $data['status'] ?? null,
+            sectionId: isset($data['sectionId']) ? (int) $data['sectionId'] : null
+        );
 
-        if (!empty($data['sectionId'])) {
-            $section = $this->sectionRepository->find($data['sectionId']);
-            if ($section) {
-                $enrollment->setSection($section);
-                $enrollment->setGrade($section->getGrade());
-            }
+        $enrollment = $this->handleCommand($command);
+
+        if (!$enrollment) {
+            return $this->error('Enrollment not found', Response::HTTP_NOT_FOUND);
         }
-
-        $this->entityManager->flush();
 
         return $this->success($enrollment);
     }
@@ -118,11 +96,11 @@ class EnrollmentController extends AbstractController
     #[Route('/{id}/cancel', name: 'api_enrollments_cancel', methods: ['POST'])]
     public function cancel(int $id)
     {
-        $enrollment = $this->enrollmentRepository->find($id);
-        if (!$enrollment) return $this->error('Enrollment not found', Response::HTTP_NOT_FOUND);
+        $enrollment = $this->handleCommand(new CancelEnrollmentCommand($id));
 
-        $enrollment->setStatus('cancelled');
-        $this->entityManager->flush();
+        if (!$enrollment) {
+            return $this->error('Enrollment not found', Response::HTTP_NOT_FOUND);
+        }
 
         return $this->success([
             'message' => 'Enrollment cancelled successfully',
@@ -133,7 +111,7 @@ class EnrollmentController extends AbstractController
     #[Route('/student/{studentId}', name: 'api_enrollments_by_student', methods: ['GET'])]
     public function byStudent(int $studentId)
     {
-        $enrollments = $this->enrollmentRepository->findByStudent($studentId);
+        $enrollments = $this->handleQuery(new GetEnrollmentsByStudentQuery($studentId));
 
         return $this->success($enrollments);
     }
@@ -142,8 +120,30 @@ class EnrollmentController extends AbstractController
     public function statsByGrade(Request $request)
     {
         $year = $request->query->getInt('year', (int) date('Y'));
-        $stats = $this->enrollmentRepository->getStatsByGrade($year);
+        $stats = $this->handleQuery(new GetEnrollmentStatsByGradeQuery($year));
 
         return $this->success($stats);
+    }
+
+    /**
+     * Handle a query and return the result
+     */
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
+    }
+
+    /**
+     * Handle a command and return the result
+     */
+    private function handleCommand(object $command): mixed
+    {
+        $envelope = $this->commandBus->dispatch($command);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
     }
 }

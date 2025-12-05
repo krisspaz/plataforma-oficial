@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\Teacher\Query\GetTeacherBirthdaysQuery;
+use App\Application\Teacher\Query\GetTeacherByIdQuery;
+use App\Application\Teacher\Query\GetTeachersBySpecializationQuery;
+use App\Application\Teacher\Query\GetTeachersQuery;
+use App\Application\Teacher\Query\SearchTeachersQuery;
 use App\Controller\Traits\ApiResponseTrait;
-use App\Repository\TeacherRepository;
-use App\Repository\UserRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
 use OpenApi\Attributes as OA;
 
@@ -21,17 +25,15 @@ class TeacherController extends AbstractController
     use ApiResponseTrait;
 
     public function __construct(
-        private readonly TeacherRepository $teacherRepository,
-        private readonly UserRepository $userRepository,
-        private readonly EntityManagerInterface $entityManager
+        private readonly MessageBusInterface $queryBus
     ) {}
 
     #[Route('', name: 'api_teachers_index', methods: ['GET'])]
     #[OA\Get(path: '/api/teachers', summary: 'List all teachers')]
     public function index(): JsonResponse
     {
-        $teachers = $this->teacherRepository->findAll();
-        
+        $teachers = $this->handleQuery(new GetTeachersQuery());
+
         return $this->success($teachers, 200, [], ['teacher:read']);
     }
 
@@ -39,8 +41,8 @@ class TeacherController extends AbstractController
     #[OA\Get(path: '/api/teachers/{id}', summary: 'Get teacher details')]
     public function show(int $id): JsonResponse
     {
-        $teacher = $this->teacherRepository->find($id);
-        
+        $teacher = $this->handleQuery(new GetTeacherByIdQuery($id));
+
         if (!$teacher) {
             return $this->notFound('Teacher');
         }
@@ -53,13 +55,13 @@ class TeacherController extends AbstractController
     public function search(Request $request): JsonResponse
     {
         $query = $request->query->get('q', '');
-        
+
         if (empty($query)) {
             return $this->validationError(['q' => 'Search query required']);
         }
 
-        $teachers = $this->teacherRepository->search($query);
-        
+        $teachers = $this->handleQuery(new SearchTeachersQuery($query));
+
         return $this->success($teachers, 200, [], ['teacher:read']);
     }
 
@@ -67,8 +69,8 @@ class TeacherController extends AbstractController
     #[OA\Get(path: '/api/teachers/specialization/{specialization}', summary: 'Get teachers by specialization')]
     public function bySpecialization(string $specialization): JsonResponse
     {
-        $teachers = $this->teacherRepository->findBySpecialization($specialization);
-        
+        $teachers = $this->handleQuery(new GetTeachersBySpecializationQuery($specialization));
+
         return $this->success($teachers, 200, [], ['teacher:read']);
     }
 
@@ -76,11 +78,19 @@ class TeacherController extends AbstractController
     #[OA\Get(path: '/api/teachers/birthdays/month', summary: 'Get teachers with birthdays this month')]
     public function birthdaysThisMonth(): JsonResponse
     {
-        $teachers = $this->teacherRepository->findBirthdaysThisMonth();
-        
-        return $this->success([
-            'teachers' => $teachers,
-            'count' => count($teachers)
-        ], 200, [], ['teacher:read']);
+        $result = $this->handleQuery(new GetTeacherBirthdaysQuery());
+
+        return $this->success($result, 200, [], ['teacher:read']);
+    }
+
+    /**
+     * Handle a query and return the result
+     */
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
     }
 }
