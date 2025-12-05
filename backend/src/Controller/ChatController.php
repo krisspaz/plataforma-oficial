@@ -1,33 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
-use App\Entity\ChatRoom;
-use App\Entity\ChatMessage;
+use App\Application\Chat\Command\CreateRoomCommand;
+use App\Application\Chat\Command\MarkMessageAsReadCommand;
+use App\Application\Chat\Command\SendMessageCommand;
+use App\Application\Chat\Query\GetRoomMessagesQuery;
+use App\Application\Chat\Query\GetUnreadMessagesQuery;
+use App\Application\Chat\Query\GetUserRoomsQuery;
 use App\Entity\User;
-use App\Repository\ChatRoomRepository;
-use App\Repository\ChatMessageRepository;
-use App\Repository\UserRepository;
-use App\Service\NotificationService;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/chat')]
 class ChatController extends AbstractController
 {
     public function __construct(
-        private ChatRoomRepository $chatRoomRepository,
-        private ChatMessageRepository $chatMessageRepository,
-        private UserRepository $userRepository,
-        private NotificationService $notificationService,
-        private EntityManagerInterface $entityManager
+        private readonly MessageBusInterface $queryBus,
+        private readonly MessageBusInterface $commandBus
     ) {}
 
-    // ===== Helpers =====
     private function getAuthenticatedUser(): ?User
     {
         $user = $this->getUser();
@@ -44,30 +43,6 @@ class ChatController extends AbstractController
         return $this->respond(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
     }
 
-    private function respondNotFound(string $message = 'Not found'): JsonResponse
-    {
-        return $this->respond(['error' => $message], Response::HTTP_NOT_FOUND);
-    }
-
-    private function notifyParticipants(ChatRoom $room, ChatMessage $message, User $sender): void
-    {
-        foreach ($room->getParticipants() ?? [] as $participantId) {
-            if ($participantId === $sender->getId()) continue;
-            $participant = $this->userRepository->find($participantId);
-            if ($participant) {
-                $preview = strlen($message->getContent()) > 50
-                    ? substr($message->getContent(), 0, 50) . '...'
-                    : $message->getContent();
-
-                $this->notificationService->notifyNewMessage(
-                    $participant,
-                    $sender->getFullName(),
-                    $preview
-                );
-            }
-        }
-    }
-
     // ===== Rooms =====
     #[Route('/rooms', name: 'api_chat_rooms', methods: ['GET'])]
     public function rooms(): JsonResponse
@@ -75,7 +50,7 @@ class ChatController extends AbstractController
         $user = $this->getAuthenticatedUser();
         if (!$user) return $this->respondNotAuthenticated();
 
-        $rooms = $this->chatRoomRepository->findByParticipant($user->getId());
+        $rooms = $this->handleQuery(new GetUserRoomsQuery($user->getId()));
         return $this->respond($rooms, Response::HTTP_OK);
     }
 
@@ -86,21 +61,18 @@ class ChatController extends AbstractController
         if (!$user) return $this->respondNotAuthenticated();
 
         $data = json_decode($request->getContent(), true);
-        if (!isset($data['participantId'])) return $this->respond(['error' => 'Participant ID required'], Response::HTTP_BAD_REQUEST);
+        if (!isset($data['participantId'])) {
+            return $this->respond(['error' => 'Participant ID required'], Response::HTTP_BAD_REQUEST);
+        }
 
-        // Check for existing room
-        $existingRoom = $this->chatRoomRepository->findOneToOneRoom($user->getId(), $data['participantId']);
-        if ($existingRoom) return $this->respond($existingRoom, Response::HTTP_OK);
+        $result = $this->handleCommand(new CreateRoomCommand(
+            userId: $user->getId(),
+            participantId: $data['participantId'],
+            name: $data['name'] ?? null
+        ));
 
-        $room = new ChatRoom();
-        $room->setType('one_to_one');
-        $room->setParticipants([$user->getId(), $data['participantId']]);
-        if (isset($data['name'])) $room->setName($data['name']);
-
-        $this->entityManager->persist($room);
-        $this->entityManager->flush();
-
-        return $this->respond($room, Response::HTTP_CREATED);
+        $status = $result['existing'] ? Response::HTTP_OK : Response::HTTP_CREATED;
+        return $this->respond($result['room'], $status);
     }
 
     // ===== Messages =====
@@ -110,14 +82,14 @@ class ChatController extends AbstractController
         $user = $this->getAuthenticatedUser();
         if (!$user) return $this->respondNotAuthenticated();
 
-        $room = $this->chatRoomRepository->find($id);
-        if (!$room) return $this->respondNotFound('Room not found');
-        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
-
         $limit = $request->query->getInt('limit', 50);
-        $messages = $this->chatMessageRepository->findByRoom($id, $limit);
+        $result = $this->handleQuery(new GetRoomMessagesQuery($id, $user->getId(), $limit));
 
-        return $this->respond($messages, Response::HTTP_OK);
+        if (isset($result['error'])) {
+            return $this->respond(['error' => $result['error']], $result['code']);
+        }
+
+        return $this->respond($result['messages'], Response::HTTP_OK);
     }
 
     #[Route('/rooms/{id}/messages', name: 'api_chat_send_message', methods: ['POST'])]
@@ -126,25 +98,23 @@ class ChatController extends AbstractController
         $user = $this->getAuthenticatedUser();
         if (!$user) return $this->respondNotAuthenticated();
 
-        $room = $this->chatRoomRepository->find($id);
-        if (!$room) return $this->respondNotFound('Room not found');
-        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
-
         $data = json_decode($request->getContent(), true);
-        if (empty($data['content'])) return $this->respond(['error' => 'Content required'], Response::HTTP_BAD_REQUEST);
+        if (empty($data['content'])) {
+            return $this->respond(['error' => 'Content required'], Response::HTTP_BAD_REQUEST);
+        }
 
-        $message = new ChatMessage();
-        $message->setRoom($room);
-        $message->setSender($user);
-        $message->setContent($data['content']);
-        $message->setAttachments($data['attachments'] ?? null);
+        $result = $this->handleCommand(new SendMessageCommand(
+            roomId: $id,
+            sender: $user,
+            content: $data['content'],
+            attachments: $data['attachments'] ?? null
+        ));
 
-        $this->entityManager->persist($message);
-        $this->entityManager->flush();
+        if (isset($result['error'])) {
+            return $this->respond(['error' => $result['error']], $result['code']);
+        }
 
-        $this->notifyParticipants($room, $message, $user);
-
-        return $this->respond($message, Response::HTTP_CREATED);
+        return $this->respond($result['message'], Response::HTTP_CREATED);
     }
 
     #[Route('/messages/{id}/read', name: 'api_chat_mark_read', methods: ['POST'])]
@@ -153,13 +123,16 @@ class ChatController extends AbstractController
         $user = $this->getAuthenticatedUser();
         if (!$user) return $this->respondNotAuthenticated();
 
-        $message = $this->chatMessageRepository->find($id);
-        if (!$message) return $this->respondNotFound('Message not found');
+        $result = $this->handleCommand(new MarkMessageAsReadCommand($id, $user->getId()));
 
-        $message->markAsReadBy($user->getId());
-        $this->entityManager->flush();
+        if (isset($result['error'])) {
+            return $this->respond(['error' => $result['error']], $result['code']);
+        }
 
-        return $this->respond(['message' => 'Message marked as read', 'chatMessage' => $message], Response::HTTP_OK);
+        return $this->respond([
+            'message' => 'Message marked as read',
+            'chatMessage' => $result['message']
+        ], Response::HTTP_OK);
     }
 
     #[Route('/rooms/{id}/unread', name: 'api_chat_unread', methods: ['GET'])]
@@ -168,11 +141,29 @@ class ChatController extends AbstractController
         $user = $this->getAuthenticatedUser();
         if (!$user) return $this->respondNotAuthenticated();
 
-        $room = $this->chatRoomRepository->find($id);
-        if (!$room) return $this->respondNotFound('Room not found');
-        if (!$room->isParticipant($user->getId())) return $this->respond(['error' => 'Unauthorized'], Response::HTTP_FORBIDDEN);
+        $result = $this->handleQuery(new GetUnreadMessagesQuery($id, $user->getId()));
 
-        $unreadMessages = $this->chatMessageRepository->findUnreadInRoom($id, $user->getId());
-        return $this->respond(['messages' => $unreadMessages, 'count' => count($unreadMessages)], Response::HTTP_OK);
+        if (isset($result['error'])) {
+            return $this->respond(['error' => $result['error']], $result['code']);
+        }
+
+        return $this->respond([
+            'messages' => $result['messages'],
+            'count' => $result['count']
+        ], Response::HTTP_OK);
+    }
+
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+        return $handledStamp?->getResult();
+    }
+
+    private function handleCommand(object $command): mixed
+    {
+        $envelope = $this->commandBus->dispatch($command);
+        $handledStamp = $envelope->last(HandledStamp::class);
+        return $handledStamp?->getResult();
     }
 }

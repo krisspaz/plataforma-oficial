@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\Parent\Query\GetMyChildrenQuery;
+use App\Application\Parent\Query\GetMyContractsQuery;
+use App\Application\Parent\Query\GetMyPaymentsQuery;
+use App\Application\Parent\Query\GetParentByIdQuery;
+use App\Application\Parent\Query\GetParentsByStudentQuery;
+use App\Application\Parent\Query\GetParentsQuery;
+use App\Application\Parent\Query\SearchParentsQuery;
 use App\Controller\Traits\ApiResponseTrait;
 use App\Entity\User;
-use App\Repository\ParentRepository;
-use App\Repository\StudentRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
 use OpenApi\Attributes as OA;
 
@@ -22,17 +28,15 @@ class ParentController extends AbstractController
     use ApiResponseTrait;
 
     public function __construct(
-        private readonly ParentRepository $parentRepository,
-        private readonly StudentRepository $studentRepository,
-        private readonly EntityManagerInterface $entityManager
+        private readonly MessageBusInterface $queryBus
     ) {}
 
     #[Route('', name: 'api_parents_index', methods: ['GET'])]
     #[OA\Get(path: '/api/parents', summary: 'List all parents')]
     public function index(): JsonResponse
     {
-        $parents = $this->parentRepository->findAll();
-        
+        $parents = $this->handleQuery(new GetParentsQuery());
+
         return $this->success($parents, 200, [], ['parent:read']);
     }
 
@@ -40,8 +44,8 @@ class ParentController extends AbstractController
     #[OA\Get(path: '/api/parents/{id}', summary: 'Get parent details')]
     public function show(int $id): JsonResponse
     {
-        $parent = $this->parentRepository->find($id);
-        
+        $parent = $this->handleQuery(new GetParentByIdQuery($id));
+
         if (!$parent) {
             return $this->notFound('Parent');
         }
@@ -58,25 +62,20 @@ class ParentController extends AbstractController
             return $this->unauthorized();
         }
 
-        $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        if (!$parent) {
+        $result = $this->handleQuery(new GetMyChildrenQuery($user));
+        if (!$result) {
             return $this->notFound('Parent profile');
         }
 
-        $children = $parent->getStudents();
-        
-        return $this->success([
-            'children' => $children,
-            'count' => count($children)
-        ], 200, [], ['student:read']);
+        return $this->success($result, 200, [], ['student:read']);
     }
 
     #[Route('/student/{studentId}', name: 'api_parents_by_student', methods: ['GET'])]
     #[OA\Get(path: '/api/parents/student/{studentId}', summary: 'Get parents by student ID')]
     public function byStudent(int $studentId): JsonResponse
     {
-        $parents = $this->parentRepository->findByStudent($studentId);
-        
+        $parents = $this->handleQuery(new GetParentsByStudentQuery($studentId));
+
         return $this->success($parents, 200, [], ['parent:read']);
     }
 
@@ -85,13 +84,13 @@ class ParentController extends AbstractController
     public function search(Request $request): JsonResponse
     {
         $query = $request->query->get('q', '');
-        
+
         if (empty($query)) {
             return $this->validationError(['q' => 'Search query required']);
         }
 
-        $parents = $this->parentRepository->search($query);
-        
+        $parents = $this->handleQuery(new SearchParentsQuery($query));
+
         return $this->success($parents, 200, [], ['parent:read']);
     }
 
@@ -104,39 +103,12 @@ class ParentController extends AbstractController
             return $this->unauthorized();
         }
 
-        $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        if (!$parent) {
+        $result = $this->handleQuery(new GetMyPaymentsQuery($user));
+        if (!$result) {
             return $this->notFound('Parent profile');
         }
 
-        $allPayments = [];
-        $totalPending = 0;
-        $totalPaid = 0;
-
-        foreach ($parent->getStudents() as $student) {
-            foreach ($student->getEnrollments() as $enrollment) {
-                if ($enrollment->getStatus() === 'active') {
-                    $payments = $enrollment->getPayments();
-                    foreach ($payments as $payment) {
-                        $allPayments[] = $payment;
-                        if ($payment->getStatus() === 'pending') {
-                            $totalPending += $payment->getAmount();
-                        } else {
-                            $totalPaid += $payment->getAmount();
-                        }
-                    }
-                }
-            }
-        }
-
-        return $this->success([
-            'payments' => $allPayments,
-            'summary' => [
-                'total_pending' => $totalPending,
-                'total_paid' => $totalPaid,
-                'count' => count($allPayments)
-            ]
-        ], 200, [], ['payment:read']);
+        return $this->success($result, 200, [], ['payment:read']);
     }
 
     #[Route('/my-contracts', name: 'api_parents_my_contracts', methods: ['GET'])]
@@ -148,16 +120,22 @@ class ParentController extends AbstractController
             return $this->unauthorized();
         }
 
-        $parent = $this->parentRepository->findOneBy(['user' => $user]);
-        if (!$parent) {
+        $result = $this->handleQuery(new GetMyContractsQuery($user));
+        if (!$result) {
             return $this->notFound('Parent profile');
         }
 
-        $contracts = $parent->getContracts();
-        
-        return $this->success([
-            'contracts' => $contracts,
-            'count' => count($contracts)
-        ], 200, [], ['contract:read']);
+        return $this->success($result, 200, [], ['contract:read']);
+    }
+
+    /**
+     * Handle a query and return the result
+     */
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
     }
 }

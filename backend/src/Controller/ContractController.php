@@ -1,33 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
-use App\Entity\Contract;
-use App\Repository\ContractRepository;
-use App\Repository\EnrollmentRepository;
-use App\Repository\ParentRepository;
-use App\Service\ContractService;
-use App\Service\NotificationService;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Application\Contract\Command\CreateContractCommand;
+use App\Application\Contract\Command\SignContractCommand;
+use App\Application\Contract\Query\GetContractByIdQuery;
+use App\Application\Contract\Query\GetContractsByEnrollmentQuery;
+use App\Application\Contract\Query\GetContractsByStudentQuery;
+use App\Application\Contract\Query\GetContractsQuery;
+use App\Application\Contract\Query\GetPendingContractsQuery;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api/contracts')]
 class ContractController extends AbstractController
 {
     public function __construct(
-        private ContractRepository $contractRepository,
-        private EnrollmentRepository $enrollmentRepository,
-        private ParentRepository $parentRepository,
-        private ContractService $contractService,
-        private NotificationService $notificationService,
-        private EntityManagerInterface $entityManager
+        private readonly MessageBusInterface $queryBus,
+        private readonly MessageBusInterface $commandBus
     ) {}
 
-    // ===== Helpers =====
     private function respond(mixed $data, int $status = 200): JsonResponse
     {
         return $this->json($data, $status);
@@ -43,25 +42,11 @@ class ContractController extends AbstractController
         return $this->respond(['error' => $message], Response::HTTP_BAD_REQUEST);
     }
 
-    private function notifyParentContract(Contract $contract, string $message): void
-    {
-        $this->notificationService->createNotification(
-            $contract->getParent()->getUser(),
-            'Contrato',
-            $message,
-            'contract',
-            ['contractId' => $contract->getId(), 'contractNumber' => $contract->getContractNumber()]
-        );
-    }
-
-    // ===== Endpoints =====
     #[Route('', name: 'api_contracts_index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
         $status = $request->query->get('status');
-        $contracts = $status
-            ? $this->contractRepository->findByStatus($status)
-            : $this->contractRepository->findAll();
+        $contracts = $this->handleQuery(new GetContractsQuery($status));
 
         return $this->respond($contracts);
     }
@@ -69,7 +54,7 @@ class ContractController extends AbstractController
     #[Route('/pending', name: 'api_contracts_pending', methods: ['GET'])]
     public function pending(): JsonResponse
     {
-        $contracts = $this->contractRepository->findPending();
+        $contracts = $this->handleQuery(new GetPendingContractsQuery());
         return $this->respond($contracts);
     }
 
@@ -82,31 +67,27 @@ class ContractController extends AbstractController
             return $this->respondBadRequest('Enrollment ID, Parent ID, and total amount are required');
         }
 
-        $enrollment = $this->enrollmentRepository->find($data['enrollmentId']);
-        if (!$enrollment) return $this->respondNotFound('Enrollment not found');
+        $result = $this->handleCommand(new CreateContractCommand(
+            enrollmentId: (int) $data['enrollmentId'],
+            parentId: (int) $data['parentId'],
+            totalAmount: (float) $data['totalAmount'],
+            installments: $data['installments'] ?? null
+        ));
 
-        $parent = $this->parentRepository->find($data['parentId']);
-        if (!$parent) return $this->respondNotFound('Parent not found');
-
-        $contract = $this->contractService->generateContract(
-            $enrollment,
-            $parent,
-            (float) $data['totalAmount'],
-            $data['installments'] ?? null
-        );
-
-        $this->notifyParentContract($contract, "Se ha generado el contrato {$contract->getContractNumber()}. Por favor revíselo y fírmelo.");
+        if (isset($result['error'])) {
+            return $this->respond(['error' => $result['error']], $result['code']);
+        }
 
         return $this->respond([
             'message' => 'Contract created successfully',
-            'contract' => $contract
+            'contract' => $result['contract']
         ], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'api_contracts_show', methods: ['GET'])]
     public function show(int $id): JsonResponse
     {
-        $contract = $this->contractRepository->find($id);
+        $contract = $this->handleQuery(new GetContractByIdQuery($id));
         if (!$contract) return $this->respondNotFound('Contract not found');
 
         return $this->respond($contract);
@@ -115,37 +96,54 @@ class ContractController extends AbstractController
     #[Route('/{id}/sign', name: 'api_contracts_sign', methods: ['POST'])]
     public function sign(int $id, Request $request): JsonResponse
     {
-        $contract = $this->contractRepository->find($id);
+        $contract = $this->handleQuery(new GetContractByIdQuery($id));
         if (!$contract) return $this->respondNotFound('Contract not found');
 
-        if ($contract->isSigned()) return $this->respondBadRequest('Contract is already signed');
+        if ($contract->isSigned()) {
+            return $this->respondBadRequest('Contract is already signed');
+        }
 
         $data = json_decode($request->getContent(), true);
-        if (empty($data['signature'] ?? null)) return $this->respondBadRequest('Signature data required');
+        if (empty($data['signature'] ?? null)) {
+            return $this->respondBadRequest('Signature data required');
+        }
 
-        $signedContract = $this->contractService->signContract($contract, $data['signature']);
-        $this->notificationService->notifyContractSigned(
-            $signedContract->getParent()->getUser(),
-            $signedContract->getContractNumber()
-        );
+        $result = $this->handleCommand(new SignContractCommand(
+            contractId: $id,
+            signature: $data['signature']
+        ));
 
         return $this->respond([
             'message' => 'Contract signed successfully',
-            'contract' => $signedContract
+            'contract' => $result['contract'] ?? $result
         ]);
     }
 
     #[Route('/enrollment/{enrollmentId}', name: 'api_contracts_by_enrollment', methods: ['GET'])]
     public function byEnrollment(int $enrollmentId): JsonResponse
     {
-        $contracts = $this->contractRepository->findByEnrollment($enrollmentId);
+        $contracts = $this->handleQuery(new GetContractsByEnrollmentQuery($enrollmentId));
         return $this->respond($contracts);
     }
 
     #[Route('/student/{studentId}', name: 'api_contracts_by_student', methods: ['GET'])]
     public function byStudent(int $studentId): JsonResponse
     {
-        $contracts = $this->contractRepository->findByStudent($studentId);
+        $contracts = $this->handleQuery(new GetContractsByStudentQuery($studentId));
         return $this->respond($contracts);
+    }
+
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+        return $handledStamp?->getResult();
+    }
+
+    private function handleCommand(object $command): mixed
+    {
+        $envelope = $this->commandBus->dispatch($command);
+        $handledStamp = $envelope->last(HandledStamp::class);
+        return $handledStamp?->getResult();
     }
 }

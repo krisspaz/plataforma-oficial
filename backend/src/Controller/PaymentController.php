@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\Payment\Command\CreatePaymentCommand;
+use App\Application\Payment\Command\MarkPaymentAsPaidCommand;
+use App\Application\Payment\Command\ProcessPaymentCommand;
+use App\Application\Payment\Command\RefundPaymentCommand;
+use App\Application\Payment\Query\GetDailyTotalQuery;
+use App\Application\Payment\Query\GetDebtorsQuery;
+use App\Application\Payment\Query\GetOverduePaymentsQuery;
+use App\Application\Payment\Query\GetPaymentsByEnrollmentQuery;
+use App\Application\Payment\Query\GetPaymentsQuery;
+use App\Application\Payment\Query\GetPendingPaymentsQuery;
 use App\Controller\Traits\ApiResponseTrait;
-use App\Entity\Payment;
-use App\Entity\User;
-use App\Repository\PaymentRepository;
-use App\Repository\EnrollmentRepository;
-use App\Service\Payment\StripePaymentService;
-use App\Service\Payment\PayPalPaymentService;
-use App\Service\Payment\BACPaymentService;
-use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use OpenApi\Attributes as OA;
@@ -30,14 +32,8 @@ class PaymentController extends AbstractController
     use ApiResponseTrait;
 
     public function __construct(
-        private readonly PaymentRepository $paymentRepository,
-        private readonly EnrollmentRepository $enrollmentRepository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly StripePaymentService $stripeService,
-        private readonly PayPalPaymentService $paypalService,
-        private readonly BACPaymentService $bacService,
-        private readonly ValidatorInterface $validator,
-        private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $queryBus,
+        private readonly MessageBusInterface $commandBus,
         private readonly RateLimiterFactory $apiLimiter
     ) {}
 
@@ -53,37 +49,29 @@ class PaymentController extends AbstractController
     )]
     public function index(Request $request): JsonResponse
     {
-        $status = $request->query->get('status');
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = min(100, max(1, (int) $request->query->get('limit', 20)));
+        $query = new GetPaymentsQuery(
+            status: $request->query->get('status'),
+            page: (int) $request->query->get('page', 1),
+            limit: (int) $request->query->get('limit', 20)
+        );
 
-        if ($status) {
-            $payments = $this->paymentRepository->findBy(
-                ['status' => $status],
-                ['createdAt' => 'DESC'],
-                $limit,
-                ($page - 1) * $limit
-            );
-            $total = $this->paymentRepository->count(['status' => $status]);
-        } else {
-            $payments = $this->paymentRepository->findBy(
-                [],
-                ['createdAt' => 'DESC'],
-                $limit,
-                ($page - 1) * $limit
-            );
-            $total = $this->paymentRepository->count([]);
-        }
+        $result = $this->handleQuery($query);
 
-        return $this->paginated($payments, $total, $page, $limit, ['payment:read']);
+        return $this->paginated(
+            $result['payments'],
+            $result['total'],
+            $result['page'],
+            $result['limit'],
+            ['payment:read']
+        );
     }
 
     #[Route('/pending', name: 'api_payments_pending', methods: ['GET'])]
     #[OA\Get(path: '/api/payments/pending', summary: 'Get pending payments')]
     public function pending(): JsonResponse
     {
-        $payments = $this->paymentRepository->findPending();
-        
+        $payments = $this->handleQuery(new GetPendingPaymentsQuery());
+
         return $this->success($payments, 200, [], ['payment:read']);
     }
 
@@ -91,8 +79,8 @@ class PaymentController extends AbstractController
     #[OA\Get(path: '/api/payments/overdue', summary: 'Get overdue payments')]
     public function overdue(): JsonResponse
     {
-        $payments = $this->paymentRepository->findOverdue();
-        
+        $payments = $this->handleQuery(new GetOverduePaymentsQuery());
+
         return $this->success($payments, 200, [], ['payment:read']);
     }
 
@@ -100,8 +88,8 @@ class PaymentController extends AbstractController
     #[OA\Get(path: '/api/payments/debtors', summary: 'Get debtors report')]
     public function debtors(): JsonResponse
     {
-        $debtors = $this->paymentRepository->getDebtorsReport();
-        
+        $debtors = $this->handleQuery(new GetDebtorsQuery());
+
         return $this->success($debtors);
     }
 
@@ -124,49 +112,26 @@ class PaymentController extends AbstractController
             ]);
         }
 
-        $enrollment = $this->enrollmentRepository->find($data['enrollmentId']);
-        if (!$enrollment) {
-            return $this->notFound('Enrollment');
-        }
+        try {
+            $command = new CreatePaymentCommand(
+                enrollmentId: (int) $data['enrollmentId'],
+                amount: (float) $data['amount'],
+                paymentType: $data['paymentType'] ?? 'contado',
+                paymentMethod: $data['paymentMethod'] ?? null,
+                dueDate: $data['dueDate'] ?? null,
+                metadata: $data['metadata'] ?? null
+            );
 
-        $payment = new Payment();
-        $payment->setEnrollment($enrollment);
-        $payment->setAmount((float) $data['amount']);
-        $payment->setPaymentType($data['paymentType'] ?? 'contado');
-        $payment->setPaymentMethod($data['paymentMethod'] ?? null);
-        $payment->setStatus('pending');
-        
-        if (isset($data['dueDate'])) {
-            try {
-                $payment->setDueDate(new \DateTime($data['dueDate']));
-            } catch (\Exception $e) {
-                return $this->validationError(['dueDate' => 'Invalid date format']);
+            $payment = $this->handleCommand($command);
+
+            if (!$payment) {
+                return $this->notFound('Enrollment');
             }
+
+            return $this->created($payment, ['payment:read']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->validationError(['dueDate' => $e->getMessage()]);
         }
-
-        if (isset($data['metadata'])) {
-            $payment->setMetadata($data['metadata']);
-        }
-
-        $errors = $this->validator->validate($payment);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->validationError($errorMessages);
-        }
-
-        $this->entityManager->persist($payment);
-        $this->entityManager->flush();
-
-        $this->logger->info('Payment created', [
-            'payment_id' => $payment->getId(),
-            'enrollment_id' => $enrollment->getId(),
-            'amount' => $payment->getAmount(),
-        ]);
-
-        return $this->created($payment, ['payment:read']);
     }
 
     #[Route('/{id}/process', name: 'api_payments_process', methods: ['POST'])]
@@ -179,69 +144,23 @@ class PaymentController extends AbstractController
             throw new TooManyRequestsHttpException();
         }
 
-        $payment = $this->paymentRepository->find($id);
-        
-        if (!$payment) {
-            return $this->notFound('Payment');
-        }
-
         $data = json_decode($request->getContent(), true);
-        $gateway = $data['gateway'] ?? 'stripe';
 
         try {
-            $result = match ($gateway) {
-                'stripe' => $this->stripeService->createPayment(
-                    $payment->getAmount(),
-                    $data['currency'] ?? 'usd',
-                    ['payment_id' => $payment->getId()]
-                ),
-                'paypal' => $this->paypalService->createPayment(
-                    $payment->getAmount(),
-                    $data['currency'] ?? 'USD',
-                    [
-                        'payment_id' => $payment->getId(),
-                        'return_url' => $data['return_url'] ?? '',
-                        'cancel_url' => $data['cancel_url'] ?? '',
-                    ]
-                ),
-                'bac' => $this->bacService->createPayment(
-                    $payment->getAmount(),
-                    $data['currency'] ?? 'GTQ',
-                    [
-                        'reference' => 'BAC-' . $payment->getId(),
-                        'return_url' => $data['return_url'] ?? '',
-                        'cancel_url' => $data['cancel_url'] ?? '',
-                    ]
-                ),
-                default => throw new \InvalidArgumentException('Invalid payment gateway'),
-            };
+            $command = new ProcessPaymentCommand(
+                paymentId: $id,
+                gateway: $data['gateway'] ?? 'stripe',
+                currency: $data['currency'] ?? 'usd',
+                returnUrl: $data['return_url'] ?? null,
+                cancelUrl: $data['cancel_url'] ?? null
+            );
 
-            $payment->setMetadata(array_merge($payment->getMetadata() ?? [], [
-                'gateway' => $gateway,
-                'gateway_payment_id' => $result['id'],
-                'processed_at' => (new \DateTime())->format('Y-m-d H:i:s'),
-            ]));
+            $result = $this->handleCommand($command);
 
-            $this->entityManager->flush();
-
-            $this->logger->info('Payment processed', [
-                'payment_id' => $payment->getId(),
-                'gateway' => $gateway,
-                'gateway_payment_id' => $result['id'],
-            ]);
-
-            return $this->success([
-                'payment' => $payment,
-                'gateway_response' => $result,
-            ], 200, [], ['payment:read']);
-
+            return $this->success($result, 200, [], ['payment:read']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->notFound('Payment');
         } catch (\Exception $e) {
-            $this->logger->error('Payment processing failed', [
-                'payment_id' => $payment->getId(),
-                'gateway' => $gateway,
-                'error' => $e->getMessage(),
-            ]);
-
             return $this->error('Payment processing failed: ' . $e->getMessage(), 500);
         }
     }
@@ -250,37 +169,20 @@ class PaymentController extends AbstractController
     #[OA\Post(path: '/api/payments/{id}/mark-paid', summary: 'Manually mark payment as paid')]
     public function markAsPaid(int $id, Request $request): JsonResponse
     {
-        $payment = $this->paymentRepository->find($id);
-        
+        $data = json_decode($request->getContent(), true);
+
+        $command = new MarkPaymentAsPaidCommand(
+            paymentId: $id,
+            paymentMethod: $data['paymentMethod'] ?? null,
+            receipt: $data['receipt'] ?? null,
+            metadata: $data['metadata'] ?? null
+        );
+
+        $payment = $this->handleCommand($command);
+
         if (!$payment) {
             return $this->notFound('Payment');
         }
-
-        $data = json_decode($request->getContent(), true);
-
-        $payment->markAsPaid();
-        
-        if (isset($data['paymentMethod'])) {
-            $payment->setPaymentMethod($data['paymentMethod']);
-        }
-
-        if (isset($data['receipt'])) {
-            $payment->setReceipt($data['receipt']);
-        }
-
-        if (isset($data['metadata'])) {
-            $payment->setMetadata(array_merge(
-                $payment->getMetadata() ?? [],
-                $data['metadata']
-            ));
-        }
-
-        $this->entityManager->flush();
-
-        $this->logger->info('Payment marked as paid', [
-            'payment_id' => $payment->getId(),
-            'amount' => $payment->getAmount(),
-        ]);
 
         return $this->success([
             'message' => 'Payment marked as paid successfully',
@@ -292,38 +194,33 @@ class PaymentController extends AbstractController
     #[OA\Get(path: '/api/payments/daily-total', summary: 'Get daily payment total')]
     public function dailyTotal(Request $request): JsonResponse
     {
-        $date = $request->query->get('date');
-        
+        $dateStr = $request->query->get('date');
+
         try {
-            $dateObj = $date ? new \DateTime($date) : new \DateTime();
+            $date = $dateStr ? new \DateTime($dateStr) : null;
         } catch (\Exception $e) {
             return $this->validationError(['date' => 'Invalid date format']);
         }
-        
-        $total = $this->paymentRepository->getDailyTotal($dateObj);
-        
-        return $this->success([
-            'date' => $dateObj->format('Y-m-d'),
-            'total' => $total,
-        ]);
+
+        $result = $this->handleQuery(new GetDailyTotalQuery($date));
+
+        return $this->success($result);
     }
 
     #[Route('/enrollment/{enrollmentId}', name: 'api_payments_by_enrollment', methods: ['GET'])]
     #[OA\Get(path: '/api/payments/enrollment/{enrollmentId}', summary: 'Get payments by enrollment')]
     public function byEnrollment(int $enrollmentId): JsonResponse
     {
-        $enrollment = $this->enrollmentRepository->find($enrollmentId);
-        
-        if (!$enrollment) {
+        $result = $this->handleQuery(new GetPaymentsByEnrollmentQuery($enrollmentId));
+
+        if (!$result) {
             return $this->notFound('Enrollment');
         }
 
-        $payments = $enrollment->getPayments();
-        
         return $this->success([
-            'payments' => $payments,
-            'totalPaid' => $enrollment->getTotalPaid(),
-            'totalPending' => $enrollment->getTotalPending(),
+            'payments' => $result['payments'],
+            'totalPaid' => $result['totalPaid'],
+            'totalPending' => $result['totalPending'],
         ], 200, [], ['payment:read']);
     }
 
@@ -331,64 +228,50 @@ class PaymentController extends AbstractController
     #[OA\Post(path: '/api/payments/{id}/refund', summary: 'Refund a payment')]
     public function refund(int $id, Request $request): JsonResponse
     {
-        $payment = $this->paymentRepository->find($id);
-        
-        if (!$payment) {
-            return $this->notFound('Payment');
-        }
-
-        if ($payment->getStatus() !== 'paid') {
-            return $this->error('Only paid payments can be refunded', 400);
-        }
-
         $data = json_decode($request->getContent(), true);
-        $amount = $data['amount'] ?? $payment->getAmount();
-        $metadata = $payment->getMetadata() ?? [];
-        $gateway = $metadata['gateway'] ?? null;
-        $gatewayPaymentId = $metadata['gateway_payment_id'] ?? null;
-
-        if (!$gateway || !$gatewayPaymentId) {
-            return $this->error('Payment was not processed through a gateway', 400);
-        }
 
         try {
-            $success = match ($gateway) {
-                'stripe' => $this->stripeService->refund($gatewayPaymentId, $amount),
-                'paypal' => $this->paypalService->refund($gatewayPaymentId, $amount),
-                'bac' => $this->bacService->refund($gatewayPaymentId, $amount),
-                default => throw new \InvalidArgumentException('Invalid payment gateway'),
-            };
+            $command = new RefundPaymentCommand(
+                paymentId: $id,
+                amount: isset($data['amount']) ? (float) $data['amount'] : null
+            );
 
-            if ($success) {
-                $payment->setStatus('refunded');
-                $payment->setMetadata(array_merge($metadata, [
-                    'refunded_at' => (new \DateTime())->format('Y-m-d H:i:s'),
-                    'refund_amount' => $amount,
-                ]));
+            $result = $this->handleCommand($command);
 
-                $this->entityManager->flush();
-
-                $this->logger->info('Payment refunded', [
-                    'payment_id' => $payment->getId(),
-                    'amount' => $amount,
-                    'gateway' => $gateway,
-                ]);
-
+            if ($result['success']) {
                 return $this->success([
                     'message' => 'Payment refunded successfully',
-                    'payment' => $payment,
+                    'payment' => $result['payment'],
                 ], 200, [], ['payment:read']);
             }
 
             return $this->error('Refund failed', 500);
-
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), 400);
         } catch (\Exception $e) {
-            $this->logger->error('Refund failed', [
-                'payment_id' => $payment->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
             return $this->error('Refund failed: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Handle a query and return the result
+     */
+    private function handleQuery(object $query): mixed
+    {
+        $envelope = $this->queryBus->dispatch($query);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
+    }
+
+    /**
+     * Handle a command and return the result
+     */
+    private function handleCommand(object $command): mixed
+    {
+        $envelope = $this->commandBus->dispatch($command);
+        $handledStamp = $envelope->last(HandledStamp::class);
+
+        return $handledStamp?->getResult();
     }
 }
